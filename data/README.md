@@ -49,3 +49,42 @@ uv run python scripts/auto_annotate.py --session s02
 - 回転拡張した同一元画像を train / val / test にまたがって分割しない
 - 元画像・生成データセット・モデル重みは GitHub に含めない（コードとメタデータは管理）
 - 今後、別の高さや照明条件、複数札画像も評価対象として増やす
+
+
+## s01 回転拡張 + s02 検証用データセット
+
+s01・s02の画像がリネーム済みで、各セッションの `report.csv` と `labels/` があり、
+**全画像の輪郭とクラスを目視確認した後**に実行します。
+
+```powershell
+uv run python scripts/generate_rotations.py
+```
+
+標準設定でs01の20枚を0～355°（5°刻み、72方向）に回転し、train 1440枚を作成します。
+s02の20枚は画像を回転させず、val 20枚としてコピーします。
+出力先は `data/datasets/green20_v1/` です。元画像と元アノテーションは変更しません。
+空でない出力先がすでに存在する場合は停止します。生成データを作り直す場合に限り、
+`uv run python scripts/generate_rotations.py --overwrite` を使ってください
+（デフォルト出力フォルダ内の既存生成データは削除されます）。
+
+出力構成：
+
+```text
+data/datasets/green20_v1/
+├── images/train/   # 1440枚
+├── images/val/     # 20枚
+├── labels/train/   # 1440件のYOLO Detectラベル
+├── labels/val/     # 20件のYOLO Detectラベル
+└── data.yaml
+```
+
+回転では札が欠けないようにキャンバスを拡張し、四隅座標も同じアフィン変換で回し、
+その外接長方形をYOLO Detectの `class x_center y_center width height` に変換します。
+元写真・レポート・生成データで札番号が一致するか確認してください。
+1440枚のPNG画像には数GB程度の保存容量が必要になる可能性があります。
+
+`data.yaml` 内の `path` は実行したPCの絶対パスです。別PCへ移した場合は更新してください。
+
+**testはこのスクリプトでは作りません。** 自陣・敵陣に複数札を並べ、
+札の配置を変えた独立撮影画像に全札の正解BBoxを付けて最終評価します。
+testはモデル選択や閾値調整に使わず、最終段階で使用してください。
