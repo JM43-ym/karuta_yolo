@@ -95,7 +95,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=None,
                         help="Default: data/annotations/green20_{height}_{session}")
     args = parser.parse_args()
-    if not re.fullmatch(r"s\\d{2}", args.session):
+    if not re.fullmatch(r"s\d{2}", args.session):
         parser.error("--session must look like s01 or s02")
     input_dir = (args.input if args.input is not None else
                  ROOT / "data/raw/green20/top" / f"{args.height}_{args.session}").resolve()
