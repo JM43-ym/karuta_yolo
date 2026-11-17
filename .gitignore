@@ -234,3 +234,8 @@ data/augmented/
 runs/
 results/
 *.pt
+
+# Auto-generated annotation reviews (not yet verified)
+data/annotations/**/*.jpg
+data/annotations/**/*.txt
+data/annotations/**/*.csv
