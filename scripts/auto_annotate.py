@@ -1,6 +1,7 @@
 """Detect one card per original image, export YOLO labels and visual previews.
 
 Run: uv run python scripts/auto_annotate.py
+     uv run python scripts/auto_annotate.py --session s02
 Images stay unchanged. Inspect previews before using any labels for training.
 """
 from __future__ import annotations
@@ -14,8 +15,6 @@ import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT_DIR = ROOT / "data/raw/green20/top/h01"
-OUTPUT_DIR = ROOT / "data/annotations/green20_h01"
 CARD_MAP = ROOT / "data/metadata/green20_cards.csv"
 FILENAME_PATTERN = re.compile(r"^card_(\d{3})_top_h\d{2}_s\d{2}\.(png|jpg|jpeg)$", re.I)
 
@@ -89,20 +88,30 @@ def make_annotation(image: np.ndarray, corners: np.ndarray) -> tuple[float, floa
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, default=INPUT_DIR)
-    parser.add_argument("--output", type=Path, default=OUTPUT_DIR)
+    parser.add_argument("--height", default="h01", choices=["h01", "h02", "h03"])
+    parser.add_argument("--session", default="s01", help="Session ID, e.g. s01")
+    parser.add_argument("--input", type=Path, default=None,
+                        help="Default: data/raw/green20/top/{height}_{session}")
+    parser.add_argument("--output", type=Path, default=None,
+                        help="Default: data/annotations/green20_{height}_{session}")
     args = parser.parse_args()
-    if not args.input.is_dir():
-        parser.error(f"Input folder not found: {args.input}")
-    labels_dir = args.output / "labels"
-    previews_dir = args.output / "previews"
+    if not re.fullmatch(r"s\\d{2}", args.session):
+        parser.error("--session must look like s01 or s02")
+    input_dir = (args.input if args.input is not None else
+                 ROOT / "data/raw/green20/top" / f"{args.height}_{args.session}").resolve()
+    output_dir = (args.output if args.output is not None else
+                  ROOT / "data/annotations" / f"green20_{args.height}_{args.session}").resolve()
+    if not input_dir.is_dir():
+        parser.error(f"Input folder not found: {input_dir}")
+    labels_dir = output_dir / "labels"
+    previews_dir = output_dir / "previews"
     labels_dir.mkdir(parents=True, exist_ok=True)
     previews_dir.mkdir(parents=True, exist_ok=True)
 
     with CARD_MAP.open(encoding="utf-8-sig", newline="") as file:
         records = list(csv.DictReader(file))
     id_to_class = {int(r["card_id"]): idx for idx, r in enumerate(records)}
-    paths = sorted((p for p in args.input.iterdir()
+    paths = sorted((p for p in input_dir.iterdir()
                     if p.suffix.lower() in {".png", ".jpg", ".jpeg"}))
     rows = []
     for path in paths:
@@ -120,6 +129,8 @@ def main() -> None:
             result.update(image_width=w, image_height=h)
             if card_id not in id_to_class:
                 raise ValueError("Filename has no known green20 card ID")
+            if f"_top_{args.height}_{args.session}" not in path.stem:
+                raise ValueError("Filename does not match selected height/session")
             candidates = candidate_rects(image)
             if not candidates:
                 raise ValueError("No plausible rectangular card detected")
@@ -154,7 +165,7 @@ def main() -> None:
         rows.append(result)
         print(f"{path.name}: {result['status']}")
 
-    report = args.output / "report.csv"
+    report = output_dir / "report.csv"
     with report.open("w", encoding="utf-8-sig", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]) if rows else
                                 ["filename", "card_id", "status"])
