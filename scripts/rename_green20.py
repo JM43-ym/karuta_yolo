@@ -3,8 +3,10 @@
 Usage:
     uv run python scripts/rename_green20.py
     uv run python scripts/rename_green20.py --apply
+    uv run python scripts/rename_green20.py --session s02
+    uv run python scripts/rename_green20.py --session s02 --apply
 
-Files must already be placed in data/raw/green20/top/h01 in D01-D20 order.
+Files must already be placed in data/raw/green20/top/h01_sXX in D01-D20 order.
 Dry-run is the default. Confirm the displayed mapping before using --apply.
 """
 from __future__ import annotations
@@ -15,7 +17,6 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_FOLDER = ROOT / "data/raw/green20/top/h01"
 MAPPING_CSV = ROOT / "data/metadata/green20_cards.csv"
 EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
@@ -29,13 +30,16 @@ def natural_key(path: Path) -> list[object]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Preview/rename 20 green karuta photos.")
-    parser.add_argument("--folder", type=Path, default=DEFAULT_FOLDER)
+    parser.add_argument("--folder", type=Path, default=None, help="Optional input folder; defaults to top/{height}_{session}")
     parser.add_argument("--height", default="h01", choices=["h01", "h02", "h03"])
-    parser.add_argument("--session", default="s01", help="Session ID, e.g. s01")
+    parser.add_argument("--session", default="s02", help="Session ID, e.g. s02 (default s02)")
     parser.add_argument("--apply", action="store_true", help="Perform rename after checking preview")
     args = parser.parse_args()
 
-    folder = args.folder.resolve()
+    if not re.fullmatch(r"s\d{2}", args.session):
+        parser.error("--session must look like s01 or s02")
+    folder = (args.folder if args.folder is not None else
+              ROOT / "data/raw/green20/top" / f"{args.height}_{args.session}").resolve()
     if not folder.is_dir():
         parser.error(f"Folder does not exist: {folder}")
 
