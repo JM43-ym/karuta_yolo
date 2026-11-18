@@ -286,3 +286,33 @@ uv run python scripts/train_green20.py --name trial_06 --epochs 30 --batch 8 --i
 **既存のv4（±15°・420枚）は削除せず比較用に保持する。**
 既存のtrial_05などの学習結果も保持する。
 新規実験は未使用の名前を指定する。
+
+## 札の実寸52×73mmを利用した四隅・縦横比の診断
+
+競技かるた札の実寸を短辺52mm、長辺73mmとして
+短辺÷長辺 = **0.712329** を期待値とする。
+YOLO Detectの矩形は画像の水平・垂直方向に沿っており、札の回転で
+見かけの比率が変わるため、YOLOの矩形比を直接この値に一致させない。
+
+推論時に `--check-geometry` を付けると、
+元画像の白い札面候補から回転矩形（4頂点）を推定し、
+緑の外周を概算する拡張を加えてから、各YOLO枠と重なり具合を比較する。
+以下の3状態を保存する。
+
+- `OK`：四隅候補がYOLO枠と重なり、比率誤差が既定の15%以内
+- `RATIO_CHECK`：重なる四隅候補はあるが、比率の誤差が大きい
+- `NOT_FOUND`：対応する四隅候補を十分な重なりで確認できなかった
+
+```powershell
+uv run python scripts/predict_green20.py --model runs/green20/trial_06/weights/best.pt --source data/raw/green20/test/competition --imgsz 1280 --conf 0.10 --check-geometry --output runs/green20_labeled/trial_06_geometry
+```
+
+追加出力：
+- `competition_001_geometry.png` など：推定四隅と診断結果を描画
+- `geometry_report.csv`：予測札番号、信頼度、測定比率、期待比率、誤差、重なり、推定四隅
+
+既存の `*_pred.png` および `predictions.csv` も保存する。
+四隅の推定は白面抽出に依存し、密着・暗部・反射・透視変形などで
+`NOT_FOUND` や不正確な結果が生じる場合がある。
+この診断はあくまで追加の幾何的な指標であり、
+YOLOの予測クラスを訂正したり、元のBBoxや学習データを改変しない。
