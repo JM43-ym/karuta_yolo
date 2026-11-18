@@ -133,5 +133,59 @@ def main():
         print("Install a CJK font, e.g. Windows Meiryo, to also draw decision prefixes.")
 
 
+def run_with_timing_log():
+    """Run inference and save one CSV record, including failures and interrupts."""
+    import json
+    import sys
+    import time
+    from datetime import datetime
+
+    def now():
+        return datetime.now().astimezone().isoformat(timespec="seconds")
+
+    started_at = now()
+    started_perf = time.perf_counter()
+    log_dir = ROOT / "runs/experiment_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    file_stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
+    log_path = log_dir / f"predict_{file_stamp}.csv"
+    status = "running"
+    error = ""
+    try:
+        main()
+        status = "completed"
+    except BaseException as exc:
+        status = "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed"
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        finished_at = now()
+        elapsed = round(time.perf_counter() - started_perf, 2)
+        total = int(round(elapsed))
+        hours, remainder = divmod(total, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        record = {
+            "activity": "YOLO推論",
+            "status": status,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "elapsed_hms": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+            "elapsed_seconds": elapsed,
+            "command": " ".join(sys.argv),
+            "error": error,
+        }
+        try:
+            with log_path.open("w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=list(record))
+                writer.writeheader()
+                writer.writerow(record)
+            print(f"Prediction timing log: {log_path}")
+            print(f"Started: {started_at}")
+            print(f"Finished: {finished_at}")
+            print(f"Elapsed: {record['elapsed_hms']}")
+        except OSError as log_exc:
+            print(f"WARNING: Could not save inference timing log: {log_exc}", file=sys.stderr)
+
+
 if __name__=="__main__":
-    main()
+    run_with_timing_log()
