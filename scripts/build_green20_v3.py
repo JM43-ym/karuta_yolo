@@ -32,7 +32,7 @@ def main():
     train_labels=V2/"labels/train"
     if not train_images.is_dir() or not train_labels.is_dir():
         parser.error("Missing green20_v2 train images/labels. Generate v2 first.")
-    singles=RAW/"top/h03_s02"
+    singles=RAW/"val/single/top/h03_s02"
     singles_report=read_report(ANN/"green20_h03_s02/report.csv")
     singles_files=sorted(singles.glob("*.png"))
     if len(singles_files)!=20 or {p.name for p in singles_files}!=set(singles_report):
@@ -49,7 +49,7 @@ def main():
     for r in layouts:
         name=r["filename"]
         prefix=name.split("_")[0]
-        img=RAW/"val/h03"/(prefix+"_cards")/name
+        img=RAW/"val/multi"/(prefix+"_cards")/name
         label=multi_ann/"labels"/(Path(name).stem+".txt")
         if report[name]["status"]!="REVIEW" or not img.is_file() or not label.is_file():
             parser.error(f"Missing or failed multi-card annotation: {name}")
@@ -79,7 +79,7 @@ def main():
     for r in layouts:
         img_name=r["filename"]
         prefix=img_name.split("_")[0]
-        original=RAW/"val/h03"/(prefix+"_cards")/img_name
+        original=RAW/"val/multi"/(prefix+"_cards")/img_name
         label=multi_ann/"labels"/(Path(img_name).stem+".txt")
         shutil.copy2(original,dest/"images/val"/img_name)
         shutil.copy2(label,dest/"labels/val"/label.name)

@@ -391,3 +391,54 @@ uv run python scripts/prediction_history.py
 `prediction_history.csv` は1行が**推論の実行1回**であり、
 10枚の画像を一括推論した場合は10行ではなく1行となる。
 個々の札の信頼度や検出座標は出力先 `predictions.csv` に保存する。
+
+## 新しい raw 画像フォルダ構成（2026-11-19）
+
+ユーザー側で整理した以下の構成にスクリプトの参照先を変更：
+
+```text
+data/raw/green20/
+├── train/
+│   ├── single/top/{h01_s01,h02_s01,h03_s01}/
+│   ├── single/oblique/
+│   ├── multi/scattered/
+│   ├── multi/touching/
+│   └── conditions/{lighting,background,camera_angle}/
+├── val/
+│   ├── single/top/h03_s02/
+│   ├── single/top/h01_s02/   (旧セッションが残っている場合のみ)
+│   ├── multi/{two_cards,three_cards,scattered}/
+│   └── conditions/{lighting,background,camera_angle}/
+├── test/
+│   ├── multi/{scattered,touching}/
+│   └── conditions/{lighting,background,camera_angle}/
+└── dev/competition/
+```
+
+`scripts/generate_rotations.py`, `scripts/auto_annotate.py`,
+`scripts/annotate_multi_val.py`, `scripts/build_green20_v3.py` を
+新パス向けに更新した。 `build_green20_v4.py` は更新した
+`session_sources()` を通じて新パスに対応する。
+`h01_s02` の旧検証セットがあればv2生成に利用し、
+なければ `h03_s02` を利用する。
+
+**移動後の確認コマンド**
+```powershell
+uv run python scripts/check_green20_paths.py
+```
+
+**既存の生成済みデータセット** `data/datasets/green20_v2/v3/v4`、
+学習済みモデル `runs/green20/trial_06`、学習・推論履歴は
+移動・削除・再構築しない。
+既存の `green20_v3/data.yaml` が引き続き有効なら、そのまま学習できる。
+v2/v3の生成スクリプトを同名の既存データセットに対して再実行しないこと。
+
+**新しい撮影画像は保存しただけでは学習に追加されない。**
+train/val/testの独立性を保ちつつ、追加写真にアノテーションを作成し、
+別名の `green20_v5` を生成する次工程が必要。
+既存の評価画像やdev画像をtrainに混ぜない。
+
+**整理後の競技配置画像10枚の推論コマンド**
+```powershell
+uv run python scripts/predict_green20.py --model runs/green20/trial_06/weights/best.pt --source data/raw/green20/dev/competition --imgsz 1280 --conf 0.10 --check-geometry --output runs/green20_labeled/trial_06_dev_competition
+```

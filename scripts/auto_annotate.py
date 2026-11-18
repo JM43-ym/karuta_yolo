@@ -97,8 +97,10 @@ def main() -> None:
     parser.add_argument("--border-height", type=float, default=0.06,
                         help="Relative expansion along long side (default 0.06)")
     parser.add_argument("--session", default="s01", help="Session ID, e.g. s01")
+    parser.add_argument("--split", choices=["train","val","test"], default=None,
+                        help="Raw data split (default: train for s01, val for s02)")
     parser.add_argument("--input", type=Path, default=None,
-                        help="Default: data/raw/green20/top/{height}_{session}")
+                        help="Default: data/raw/green20/{split}/single/top/{height}_{session}")
     parser.add_argument("--output", type=Path, default=None,
                         help="Default: data/annotations/green20_{height}_{session}")
     args = parser.parse_args()
@@ -106,8 +108,10 @@ def main() -> None:
         parser.error("Expansion fractions must be between 0 and 0.30")
     if not re.fullmatch(r"s\d{2}", args.session):
         parser.error("--session must look like s01 or s02")
+    split=args.split or ("train" if args.session=="s01" else "val")
     input_dir = (args.input if args.input is not None else
-                 ROOT / "data/raw/green20/top" / f"{args.height}_{args.session}").resolve()
+                 ROOT / "data/raw/green20" / split / "single" / "top" /
+                 f"{args.height}_{args.session}").resolve()
     output_dir = (args.output if args.output is not None else
                   ROOT / "data/annotations" / f"green20_{args.height}_{args.session}").resolve()
     if not input_dir.is_dir():

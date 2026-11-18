@@ -1,7 +1,7 @@
 """YOLO inference with card number + kimariji on output image and CSV.
 
 Example:
- uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_01/weights/best.pt --source data/raw/green20/test/competition --imgsz 1280 --conf 0.25
+ uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_01/weights/best.pt --source data/raw/green20/dev/competition --imgsz 1280 --conf 0.25
 
 Requires Pillow for Japanese image labels (usually included with Ultralytics).\nUse --labels-dir to write a separate *_gt.png with correct card IDs and prefixes.
 """

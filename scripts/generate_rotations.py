@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "data/raw/green20/top"
+RAW = ROOT / "data/raw/green20"
 ANNOTATIONS = ROOT / "data/annotations"
 DEFAULT_OUTPUT = ROOT / "data/datasets/green20_v2"
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
@@ -115,7 +115,8 @@ def write_label(path: Path, class_id: int, bbox: tuple[float, ...]) -> None:
 
 
 def session_sources(height: str, session: str) -> tuple[Path, Path, dict[str, dict[str, str]], list[Path]]:
-    source = RAW / f"{height}_{session}"
+    split = "train" if session == "s01" else "val"
+    source = RAW / split / "single" / "top" / f"{height}_{session}"
     report = ANNOTATIONS / f"green20_{height}_{session}" / "report.csv"
     if not source.is_dir():
         raise FileNotFoundError(f"Source folder missing: {source}")
@@ -138,7 +139,7 @@ def main() -> None:
     if args.step <= 0 or 360 % args.step != 0:
         parser.error("--step must be a positive divisor of 360")
     output = args.output.resolve()
-    if output == ROOT or output == ROOT / "data" or output == RAW or output == ANNOTATIONS:
+    if output == ROOT or output == ROOT / "data" or output == RAW or output == ANNOTATIONS or output == RAW.parent:
         parser.error("Unsafe output path")
     if output.exists() and any(output.iterdir()):
         if not args.overwrite:
@@ -149,7 +150,10 @@ def main() -> None:
         shutil.rmtree(output)
 
     training_sources = [(height, *session_sources(height, "s01")) for height in ("h01", "h02", "h03")]
-    _, _, val_rows, val_images = session_sources("h01", "s02")
+    # Keep the legacy h01_s02 validation session if present, otherwise use
+    # the currently maintained independent h03_s02 session.
+    val_height = "h01" if (RAW / "val/single/top/h01_s02").is_dir() else "h03"
+    _, _, val_rows, val_images = session_sources(val_height, "s02")
 
     with (ROOT / "data/metadata/green20_cards.csv").open(
             "r", encoding="utf-8-sig", newline="") as f:
@@ -161,7 +165,7 @@ def main() -> None:
     # Validate all four sessions before starting to generate files.
     all_sources = [(height, "s01", rows, photos)
                    for height, _, _, rows, photos in training_sources]
-    all_sources.append(("h01", "s02", val_rows, val_images))
+    all_sources.append((val_height, "s02", val_rows, val_images))
     for height, session, rows, photos in all_sources:
         for photo in photos:
             row = rows[photo.name]
