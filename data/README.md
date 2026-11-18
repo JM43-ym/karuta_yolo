@@ -166,3 +166,54 @@ uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_
 整列した競技配置と散らし配置はフォルダを分け、モデル設定を決めた後の未使用画像
 のみを独立testとして使う。すでに推論に使用した `competition_001.png` は
 開発用として扱う。評価には各画像内の全札の正解クラスとBBoxが別途必要。
+
+## v4: 実運用の向きだけで学習する（反転なし）
+
+旧v2/v3では元画像を0～355°まで回転させており、札が逆さまに写る
+学習画像も含まれていた。さらに通常のYOLO学習設定では左右反転
+`fliplr` が有効になり得る。v4では両方を修正し、
+正立方向から-15°～+15°（5°刻み）のみを生成する。
+**実際のカメラで180°向きの札も映る場合は、その向きも別途考慮すること。**
+
+```powershell
+uv run python scripts/build_green20_v4.py
+uv run python scripts/train_green20.py --name trial_04 --epochs 30 --batch 8 --imgsz 640
+```
+
+- v4 train: 60元画像 × 7方向 = 420枚（全20クラス、21枚/クラス）
+- v4 val: v3の独立撮影60画像、計120札を複製
+- `v4/data.yaml` のクラス名は `017（ちは）` など日本語の決まり字付き
+- `fliplr=0.0, flipud=0.0, degrees=0.0, shear=0.0, perspective=0.0,
+  mosaic=0.0, mixup=0.0, copy_paste=0.0` を学習に明示
+- 旧データ・旧モデルを削除・上書きしない
+
+v4は学習画像枚数がv3より大幅に少ないため、学習条件を完全に揃えた
+性能比較にはならない。回転方向を適切に制限した影響を観察する
+探索実験として扱う。今後は元画像の追加などを検討する。
+
+### 保存される学習記録
+
+通常のYOLOはrunフォルダに `args.yaml`（epochs/batch/imgsz/学習設定）、
+`results.csv`（各epochのPrecision、Recall、mAP、損失等）、
+`weights/best.pt` と `last.pt`、各種画像を保存する。
+
+新しい `scripts/train_green20.py` ではさらに
+`runs/experiment_logs/trial_04_YYYYMMDD_HHMMSS.json` に以下を保存する。
+開始日時、終了日時（タイムゾーン付き）、経過秒数、
+学習条件、ライブラリバージョン、GPU/CUDA情報の一部、
+終了状態、最終epochの評価値、および学習結果metrics。
+実行が中断・失敗した場合もログを可能な範囲で残す。
+
+### 決まり字付きの検証画像
+
+v4のvalの正解（GT）とモデルの予測を別々の画像に描く。
+
+```powershell
+uv run python scripts/predict_green20.py --model runs/green20/trial_04/weights/best.pt --source data/datasets/green20_v4/images/val --labels-dir data/datasets/green20_v4/labels/val --imgsz 1280 --conf 0.18 --output runs/green20_labeled/trial_04_val
+```
+
+`*_pred.png`（オレンジ枠、予測クラスと決まり字・信頼度）、
+`*_gt.png`（緑枠、正解クラスと決まり字）、
+`predictions.csv` を生成する。
+標準のYOLO `val_batch*_pred.jpg` と別の出力であり、標準画像を置き換えない。
+Windows環境のメイリオ等、日本語フォントが必要。
