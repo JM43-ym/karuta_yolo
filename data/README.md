@@ -365,3 +365,29 @@ uv run python scripts/predict_green20.py --model runs/green20/trial_05/weights/b
 対応候補のIoU下限0.30と重複枠除去・最大20件は維持。
 この判定は推論後の診断であり、再学習は360°回転（5°間隔）
 の既存v3データセットで別途行う。
+
+## 学習履歴と推論履歴をそれぞれ1つのCSVに統一
+
+- 学習履歴：`runs/experiment_logs/training_history.csv`（学習1回につき1行）
+- 推論履歴：`runs/experiment_logs/prediction_history.csv`（推論コマンド1回につき1行）
+- 各学習の詳細ログ：`runs/experiment_logs/trial_XX_日時/experiment.json`
+- 推論の各画像の予測内容：各 `--output` フォルダの `predictions.csv`、
+  四隅のチェックは `geometry_report.csv`（一覧の実行時間ログとは別）
+
+従来の `predict_20261118_222640_*.csv` 等は以下で結合できる。
+
+```powershell
+uv run python scripts/prediction_history.py
+```
+
+日本語がExcelで読めるUTF-8 BOM付きの `prediction_history.csv`
+を作成し、旧 `predict_*.csv` を取り込み、統合CSVが書き込まれた
+ことを検証してから旧個別CSVを削除する。
+旧ファイルも残したければ `--keep-legacy` を付ける。
+新しい `predict_green20.py` は以後、推論のたびに上記一覧に追記し、
+個別の `predict_日時.csv` を新規作成しない。新しい推論を最初に実行した
+際にも旧ログの統合を試みる。
+
+`prediction_history.csv` は1行が**推論の実行1回**であり、
+10枚の画像を一括推論した場合は10行ではなく1行となる。
+個々の札の信頼度や検出座標は出力先 `predictions.csv` に保存する。
