@@ -332,3 +332,28 @@ YOLOの予測クラスを訂正したり、元のBBoxや学習データを改変
 誤って対応付ける**可能性がある。
 NOT_FOUNDは縦横比の不一致ではなく、候補が見つからないか
 候補と予測枠が十分重なっていないことを意味する。
+
+### 重複検出の削減・20枚上限（推論後処理）
+
+`predict_green20.py` は推論結果を信頼度の高い順に確認し、
+クラス名が異なっていても同じ場所を囲む枠は重複と判定して
+低信頼度のものを除外する。既定値は
+`--dedup-iou 0.55`（矩形同士のIoU）、
+`--dedup-coverage 0.80`（小さい枠の80%以上が重なる場合）、
+`--max-cards 20`（各画像の出力上限）。
+これらはモデル本体ではなく推論後処理に適用する。
+
+`--ratio-tolerance` の既定値は **±15%** に戻した。
+一方、四隅候補との対応付けに使う
+`--min-geometry-iou 0.30` は維持する。
+縦横比診断が`NOT_FOUND`の場合でも、自動で予測を削除しない。
+
+```powershell
+uv run python scripts/predict_green20.py --model runs/green20/trial_05/weights/best.pt --source data/raw/green20/test/competition --imgsz 1280 --conf 0.10 --check-geometry --max-cards 20 --dedup-iou 0.55 --dedup-coverage 0.80 --ratio-tolerance 0.15 --output runs/green20_labeled/trial_05_dedup
+```
+
+画像には重複削減後の枠だけが表示され、`predictions.csv` および
+`geometry_report.csv` にも削減後の予測だけが記録される。
+ターミナルに各画像の元候補数、採用数、除外数を表示する。
+**最大20件は正しい20枚の検出を保証しない**。別々の札を誤って
+統合する場合もあるため、元の推論画像と比較して確認する。
