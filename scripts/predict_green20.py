@@ -135,7 +135,6 @@ def main():
 
 def run_with_timing_log():
     """Run inference and save one CSV record, including failures and interrupts."""
-    import json
     import sys
     import time
     from datetime import datetime
