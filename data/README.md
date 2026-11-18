@@ -239,3 +239,15 @@ valは単札・2枚・3枚配置の画像数も記録する。
 `data.yaml` にtestの指定がないときは、test枚数は**空欄（未設定）**。
 競技配置画像で独立に実行した推論枚数と混同しない。
 旧実験のログは自動的に一覧へ遡及追記されない。
+
+## 2026-11 更新：個別フォルダを日時付きに統一
+
+`scripts/train_green20.py --name train_05` は実行ごとに
+`runs/green20/train_05_YYYYMMDD_HHMMSS/` を作成し、
+`weights/best.pt`・`weights/last.pt`・`args.yaml`・`results.csv`・`results.png`
+などYOLO標準の生成物と `experiment.json` を同一フォルダ内に保存する。
+
+**全実験の比較は `runs/experiment_logs/training_history.csv`（1回1行）を主とし、個別のサマリーCSVは作成しない。**
+学習条件・train/val/test画像数・元画像数・オフライン拡張画像数・ラベル数・時刻・経過時間・精度指標を記録する。
+`experiment.json` は中断時の詳細調査用の小さなテキストファイルである。
+過去に作成された個別CSVや学習フォルダは自動削除しない。
