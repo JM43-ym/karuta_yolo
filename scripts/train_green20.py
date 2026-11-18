@@ -3,7 +3,8 @@
 Example:
  uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_04
 
-Log: runs/experiment_logs/training_history.csv (one row per run)\nDetailed run files: runs/green20/<name>_<YYYYMMDD_HHMMSS>/
+Log: runs/experiment_logs/training_history.csv (one row per run)
+Detailed run files: runs/green20/<name>_<YYYYMMDD_HHMMSS>/
 Normal Ultralytics outputs (args.yaml, results.csv, best.pt) stay in run directory.
 """
 from __future__ import annotations
@@ -45,6 +46,7 @@ def main() -> None:
         ap.error(f"Missing data.yaml: {data}")
     if args.epochs<1 or args.batch<1 or args.imgsz<32:
         ap.error("Invalid epochs, batch or imgsz")
+    dataset_stats=inventory(data)
     run_project=ROOT/"runs/green20"
     log_dir=ROOT/"runs/experiment_logs"
     log_dir.mkdir(parents=True,exist_ok=True)
@@ -59,7 +61,6 @@ def main() -> None:
                 project=str(run_project),name=run_name,
                 fliplr=0.0,flipud=0.0,degrees=0.0,shear=0.0,perspective=0.0,
                 mosaic=0.0,mixup=0.0,copy_paste=0.0)
-    dataset_stats=inventory(data)
     record=dict(status="running",started_at=timestamp(),dataset_inventory=dataset_stats,parameters=params,
                 python=sys.version.split()[0],torch=torch.__version__,
                 cuda=torch.version.cuda,ultralytics=ultralytics.__version__,
