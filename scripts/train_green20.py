@@ -3,7 +3,7 @@
 Example:
  uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_04
 
-Log: runs/experiment_logs/<experiment>_<date>.json
+Log: runs/experiment_logs/<experiment>_<date>.json and .csv
 Normal Ultralytics outputs (args.yaml, results.csv, best.pt) stay in run directory.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ import json
 import platform
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import torch
@@ -79,6 +79,10 @@ def main() -> None:
     finally:
         record["finished_at"]=timestamp()
         record["elapsed_seconds"]=round(time.perf_counter()-start,2)
+        total=int(round(record["elapsed_seconds"]))
+        hours,rem=divmod(total,3600)
+        minutes,seconds=divmod(rem,60)
+        record["elapsed_hms"]=f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         trainer=getattr(model,"trainer",None) if model is not None else None
         if trainer is not None and getattr(trainer,"save_dir",None) is not None:
             run_dir=Path(trainer.save_dir)
@@ -94,7 +98,40 @@ def main() -> None:
                 except (OSError,ValueError) as exc:
                     record["results_csv_warning"]=str(exc)
         log_file.write_text(json.dumps(record,ensure_ascii=False,indent=2),encoding="utf-8")
+        # Each experiment gets its own simple spreadsheet-readable CSV summary.
+        metrics=record.get("metrics",{})
+        last=record.get("last_epoch_metrics",{})
+        summary={
+            "experiment":args.name,
+            "status":record["status"],
+            "started_at":record["started_at"],
+            "finished_at":record["finished_at"],
+            "elapsed_hms":record["elapsed_hms"],
+            "elapsed_seconds":record["elapsed_seconds"],
+            "epochs_requested":args.epochs,
+            "epochs_recorded":record.get("recorded_epochs",""),
+            "batch":args.batch,
+            "imgsz":args.imgsz,
+            "dataset":str(data),
+            "run_dir":record.get("run_dir",""),
+        }
+        for output_key,metric_key in (
+            ("precision","metrics/precision(B)"),
+            ("recall","metrics/recall(B)"),
+            ("mAP50","metrics/mAP50(B)"),
+            ("mAP50_95","metrics/mAP50-95(B)"),
+        ):
+            summary[output_key]=metrics.get(metric_key,last.get(metric_key,""))
+        summary_path=log_file.with_suffix(".csv")
+        with summary_path.open("w",encoding="utf-8-sig",newline="") as f:
+            writer=csv.DictWriter(f,fieldnames=list(summary))
+            writer.writeheader()
+            writer.writerow(summary)
         print(f"Experiment log: {log_file}")
+        print(f"Experiment summary: {summary_path}")
+        print("Started: "+record["started_at"])
+        print("Finished: "+record["finished_at"])
+        print("Elapsed: "+record["elapsed_hms"]+" ("+str(record["elapsed_seconds"])+" seconds)")
         if record.get("run_dir"):
             print(f"Ultralytics run: {record['run_dir']}")
 
