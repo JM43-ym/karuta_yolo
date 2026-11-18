@@ -20,6 +20,7 @@ from pathlib import Path
 import torch
 import ultralytics
 from ultralytics import YOLO
+from dataset_inventory import inventory
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -53,7 +54,8 @@ def main() -> None:
                 project=str(run_project),name=args.name,
                 fliplr=0.0,flipud=0.0,degrees=0.0,shear=0.0,perspective=0.0,
                 mosaic=0.0,mixup=0.0,copy_paste=0.0)
-    record=dict(status="running",started_at=timestamp(),parameters=params,
+    dataset_stats=inventory(data)
+    record=dict(status="running",started_at=timestamp(),dataset_inventory=dataset_stats,parameters=params,
                 python=sys.version.split()[0],torch=torch.__version__,
                 cuda=torch.version.cuda,ultralytics=ultralytics.__version__,
                 platform=platform.platform())
@@ -101,8 +103,14 @@ def main() -> None:
         # Each experiment gets its own simple spreadsheet-readable CSV summary.
         metrics=record.get("metrics",{})
         last=record.get("last_epoch_metrics",{})
+        train_stats=dataset_stats["splits"].get("train",{})
+        val_stats=dataset_stats["splits"].get("val",{})
+        train_groups=train_stats.get("by_group",{})
+        train_sources=train_stats.get("by_group_source",{})
+        val_groups=val_stats.get("by_group",{})
         summary={
             "experiment":args.name,
+            "log_file":str(log_file),
             "status":record["status"],
             "started_at":record["started_at"],
             "finished_at":record["finished_at"],
@@ -113,6 +121,24 @@ def main() -> None:
             "batch":args.batch,
             "imgsz":args.imgsz,
             "dataset":str(data),
+            "train_images":train_stats.get("images",0),
+            "train_original_images":train_stats.get("original_images",0),
+            "train_augmented_images":train_stats.get("augmented_images",0),
+            "train_instances":train_stats.get("instances",0),
+            "train_h01_images":train_groups.get("h01",0),
+            "train_h01_original":train_sources.get("h01",{}).get("original",0),
+            "train_h01_augmented":train_sources.get("h01",{}).get("augmented",0),
+            "train_h02_images":train_groups.get("h02",0),
+            "train_h02_original":train_sources.get("h02",{}).get("original",0),
+            "train_h02_augmented":train_sources.get("h02",{}).get("augmented",0),
+            "train_h03_images":train_groups.get("h03",0),
+            "train_h03_original":train_sources.get("h03",{}).get("original",0),
+            "train_h03_augmented":train_sources.get("h03",{}).get("augmented",0),
+            "val_images":val_stats.get("images",0),
+            "val_instances":val_stats.get("instances",0),
+            "val_single_images":val_groups.get("single_cards",0),
+            "val_two_cards_images":val_groups.get("two_cards",0),
+            "val_three_cards_images":val_groups.get("three_cards",0),
             "run_dir":record.get("run_dir",""),
         }
         for output_key,metric_key in (
@@ -127,6 +153,20 @@ def main() -> None:
             writer=csv.DictWriter(f,fieldnames=list(summary))
             writer.writeheader()
             writer.writerow(summary)
+        # A single UTF-8 BOM CSV table for all experiments, with one row per run.
+        index_path=log_dir/"training_history.csv"
+        prior=[]
+        if index_path.is_file():
+            with index_path.open("r",encoding="utf-8-sig",newline="") as f:
+                prior=list(csv.DictReader(f))
+        prior=[r for r in prior if r.get("log_file")!=str(log_file)]
+        fields=list(dict.fromkeys(list(summary)+[k for r in prior for k in r]))
+        prior.append(summary)
+        with index_path.open("w",encoding="utf-8-sig",newline="") as f:
+            writer=csv.DictWriter(f,fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(prior)
+        print(f"Experiment history: {index_path}")
         print(f"Experiment log: {log_file}")
         print(f"Experiment summary: {summary_path}")
         print("Started: "+record["started_at"])
