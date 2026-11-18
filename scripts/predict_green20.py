@@ -14,6 +14,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from card_geometry import extract_candidates, assess, draw_checks, EXPECTED_RATIO
 
 ROOT=Path(__file__).resolve().parents[1]
 METADATA=ROOT/"data/metadata/green20_cards.csv"
@@ -42,9 +43,15 @@ def main():
     parser.add_argument("--imgsz",type=int,default=1280)
     parser.add_argument("--conf",type=float,default=0.25)
     parser.add_argument("--device",default="0")
+    parser.add_argument("--check-geometry",action="store_true",
+                        help="Evaluate card corners against 52x73mm physical ratio")
+    parser.add_argument("--ratio-tolerance",type=float,default=0.15)
+    parser.add_argument("--min-geometry-iou",type=float,default=0.45)
     parser.add_argument("--labels-dir",type=Path,default=None,
                         help="YOLO ground-truth labels folder (save extra *_gt.png for validation)")
     args=parser.parse_args()
+    if not (0 < args.ratio_tolerance < 1 and 0 < args.min_geometry_iou < 1):
+        parser.error("Geometry tolerances must be between 0 and 1")
     with METADATA.open(encoding="utf-8-sig",newline="") as f:
         cards=list(csv.DictReader(f))
     lookup={i:(str(row["card_id"]).zfill(3),row["decision_prefix"])
@@ -61,6 +68,7 @@ def main():
     results=model.predict(source=args.source,imgsz=args.imgsz,conf=args.conf,
                           device=args.device,stream=True,verbose=False)
     rows=[]
+    geometry_rows=[]
     for result in results:
         original=result.orig_img
         if original is None:
@@ -69,6 +77,8 @@ def main():
         draw=ImageDraw.Draw(image)
         name=Path(result.path).name
         boxes=result.boxes
+        geometry_candidates=extract_candidates(original) if args.check_geometry else []
+        geometry_checks=[]
         if boxes is not None:
             for box in boxes:
                 cid=int(box.cls.item())
@@ -85,10 +95,41 @@ def main():
                     bb=draw.textbbox((tx,ty),label,font=font)
                     draw.rectangle((bb[0]-2,bb[1]-2,bb[2]+3,bb[3]+3),fill=(0,0,0))
                     draw.text((tx,ty),label,font=font,fill=(255,255,255))
+                if args.check_geometry:
+                    check=assess((x0,y0,x1,y1),geometry_candidates,
+                                 ratio_tolerance=args.ratio_tolerance,
+                                 min_iou=args.min_geometry_iou)
+                    geometry_checks.append(dict(card_id=card,bbox=(x0,y0,x1,y1),geometry=check))
+                    corners=check["corners"]
+                    geometry_rows.append(dict(
+                        image=name,card_id=card,decision_prefix=prefix,
+                        confidence=f"{conf:.5f}",geometry_status=check["status"],
+                        expected_short_long_ratio=f"{EXPECTED_RATIO:.6f}",
+                        measured_short_long_ratio=(
+                            f'{check["ratio"]:.6f}' if check["ratio"] is not None else ""),
+                        relative_ratio_error=(
+                            f'{check["ratio_error"]:.6f}' if check["ratio_error"] is not None else ""),
+                        candidate_bbox_iou=f'{check["overlap"]:.6f}',
+                        corner_points_px=(
+                            ";".join(f"{p[0]:.1f},{p[1]:.1f}" for p in corners)
+                            if corners is not None else ""),
+                        candidate_method=check["method"]))
                 rows.append(dict(image=name,card_id=card,decision_prefix=prefix,
                                  confidence=f"{conf:.5f}",x0=round(x0,1),y0=round(y0,1),
                                  x1=round(x1,1),y1=round(y1,1)))
                 print(f"{name}: {card} ({prefix}) {conf:.1%}")
+        if args.check_geometry:
+            geom_vis=draw_checks(original,geometry_checks)
+            geom_file=out/(Path(name).stem+"_geometry.png")
+            ok,encoded=cv2.imencode(".png",geom_vis)
+            if not ok:
+                raise OSError(f"Could not encode geometry preview: {geom_file}")
+            encoded.tofile(str(geom_file))
+            statuses=[r["geometry"]["status"] for r in geometry_checks]
+            print(f"Geometry: {name}: OK={statuses.count('OK')} "
+                  f"RATIO_CHECK={statuses.count('RATIO_CHECK')} "
+                  f"NOT_FOUND={statuses.count('NOT_FOUND')}")
+            print(f"Saved: {geom_file}")
         if args.labels_dir is not None:
             gt_path=args.labels_dir/(Path(name).stem+".txt")
             if not gt_path.is_file():
@@ -128,6 +169,18 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     print(f"Saved: {out/'predictions.csv'}")
+    if args.check_geometry:
+        geometry_csv=out/"geometry_report.csv"
+        columns=["image","card_id","decision_prefix","confidence",
+                 "geometry_status","expected_short_long_ratio",
+                 "measured_short_long_ratio","relative_ratio_error",
+                 "candidate_bbox_iou","corner_points_px","candidate_method"]
+        with geometry_csv.open("w",encoding="utf-8-sig",newline="") as f:
+            writer=csv.DictWriter(f,fieldnames=columns)
+            writer.writeheader()
+            writer.writerows(geometry_rows)
+        print(f"Saved: {geometry_csv}")
+        print("Geometry flags are diagnostic, not proof of correct class.")
     if font is None:
         print("WARNING: No Japanese font found. Japanese labels are in CSV/console only.")
         print("Install a CJK font, e.g. Windows Meiryo, to also draw decision prefixes.")
