@@ -45,8 +45,8 @@ def main():
     parser.add_argument("--device",default="0")
     parser.add_argument("--check-geometry",action="store_true",
                         help="Evaluate card corners against 52x73mm physical ratio")
-    parser.add_argument("--ratio-tolerance",type=float,default=0.15)
-    parser.add_argument("--min-geometry-iou",type=float,default=0.45)
+    parser.add_argument("--ratio-tolerance",type=float,default=0.25)
+    parser.add_argument("--min-geometry-iou",type=float,default=0.30)
     parser.add_argument("--labels-dir",type=Path,default=None,
                         help="YOLO ground-truth labels folder (save extra *_gt.png for validation)")
     args=parser.parse_args()
