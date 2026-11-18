@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from card_geometry import extract_candidates, assess, draw_checks, EXPECTED_RATIO
+from prediction_filter import select_indices
 
 ROOT=Path(__file__).resolve().parents[1]
 METADATA=ROOT/"data/metadata/green20_cards.csv"
@@ -45,13 +46,19 @@ def main():
     parser.add_argument("--device",default="0")
     parser.add_argument("--check-geometry",action="store_true",
                         help="Evaluate card corners against 52x73mm physical ratio")
-    parser.add_argument("--ratio-tolerance",type=float,default=0.25)
+    parser.add_argument("--ratio-tolerance",type=float,default=0.15)
     parser.add_argument("--min-geometry-iou",type=float,default=0.30)
+    parser.add_argument("--max-cards",type=int,default=20,
+                        help="Maximum predictions per image, not a target")
+    parser.add_argument("--dedup-iou",type=float,default=0.55)
+    parser.add_argument("--dedup-coverage",type=float,default=0.80)
     parser.add_argument("--labels-dir",type=Path,default=None,
                         help="YOLO ground-truth labels folder (save extra *_gt.png for validation)")
     args=parser.parse_args()
     if not (0 < args.ratio_tolerance < 1 and 0 < args.min_geometry_iou < 1):
         parser.error("Geometry tolerances must be between 0 and 1")
+    if args.max_cards<1 or not (0<args.dedup_iou<1) or not (0<args.dedup_coverage<=1):
+        parser.error("Invalid box deduplication settings")
     with METADATA.open(encoding="utf-8-sig",newline="") as f:
         cards=list(csv.DictReader(f))
     lookup={i:(str(row["card_id"]).zfill(3),row["decision_prefix"])
@@ -80,7 +87,17 @@ def main():
         geometry_candidates=extract_candidates(original) if args.check_geometry else []
         geometry_checks=[]
         if boxes is not None:
-            for box in boxes:
+            raw_boxes=list(boxes)
+            positions=[tuple(map(float,b.xyxy[0].tolist())) for b in raw_boxes]
+            confidences=[float(b.conf.item()) for b in raw_boxes]
+            kept=select_indices(positions,confidences,
+                                max_cards=args.max_cards,
+                                iou_threshold=args.dedup_iou,
+                                coverage_threshold=args.dedup_coverage)
+            print(f"{name}: raw={len(raw_boxes)}, kept={len(kept)}, "
+                  f"removed={len(raw_boxes)-len(kept)}")
+            for index in kept:
+                box=raw_boxes[index]
                 cid=int(box.cls.item())
                 if cid not in lookup:
                     raise ValueError(f"Unexpected class ID: {cid}")
