@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import json
+import re
 from collections import Counter
 from pathlib import Path
 import yaml
@@ -38,6 +39,7 @@ def inventory(data_yaml:Path)->dict:
         if split not in cfg:continue
         images=_paths(cfg[split],base)
         by_group=Counter()
+        by_source=Counter()
         by_class=Counter()
         count=0
         missing=[]
@@ -51,6 +53,12 @@ def inventory(data_yaml:Path)->dict:
                 group="three_cards"
             else:group="single_cards"
             by_group[group]+=1
+            rotation_match=re.search(r"_rot(?:([0-9]{3})|([mp])([0-9]{2}))$",stem)
+            original_angle=bool(rotation_match) and (
+                rotation_match.group(1)=="000" or (
+                    rotation_match.group(2)=="p" and rotation_match.group(3)=="00"))
+            variant="augmented" if rotation_match and not original_angle else "original"
+            by_source[(group,variant)]+=1
             # Standard Ultralytics images/<split> -> labels/<split>.
             parts=list(img.parts)
             if "images" in parts:
@@ -69,6 +77,11 @@ def inventory(data_yaml:Path)->dict:
                 count+=1
         result["splits"][split]={"images":len(images),"instances":count,
             "by_group":dict(sorted(by_group.items())),
+            "original_images":sum(v for (g,t),v in by_source.items() if t=="original"),
+            "augmented_images":sum(v for (g,t),v in by_source.items() if t=="augmented"),
+            "by_group_source":{g:{"original":by_source[(g,"original")],
+                                  "augmented":by_source[(g,"augmented")]}
+                               for g in sorted(by_group)},
             "by_class":dict(sorted(by_class.items(),key=lambda x:int(x[0]))),
             "missing_labels":len(missing)}
         if missing:raise FileNotFoundError(f"{len(missing)} missing labels, first: {missing[0]}")
