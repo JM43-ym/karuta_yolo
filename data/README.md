@@ -112,3 +112,57 @@ PNG 4320枚のため、空き容量を十分確保してください。
 
 **元画像・元ラベルが変わった場合、学習用データセットは自動更新されません。**
 必ず再生成し、目視確認を行ってから学習してください。
+
+## h03単札＋2/3枚配置の検証（green20_v3）
+
+- train: `green20_v2/images/train` の4,320枚を再利用し、複製しない
+- val: `top/h03_s02` の単札20枚と `val/h03/two_cards` 20枚、
+  `val/h03/three_cards` 20枚（計60画像・120札）
+- 40枚の札番号は `data/metadata/green20_val_layouts.csv` に記録済み。
+  撮影順のファイル名 `two_1.png`～`two_20.png` と
+  `three_1.png`～`three_20.png` が必要。
+
+```powershell
+# h03単札（未リネームなら実行前に名前・順番を確認）
+uv run python scripts/rename_green20.py --height h03 --session s02
+uv run python scripts/rename_green20.py --height h03 --session s02 --apply
+uv run python scripts/auto_annotate.py --height h03 --session s02
+
+# 2枚/3枚配置（密着札の白面候補を左右に対応づけ）
+uv run python scripts/annotate_multi_val.py
+```
+
+`data/annotations/green20_h03_multi_val/previews/` に40枚分の確認画像、
+`report.csv` に検出状態を出力する。必ず各札の外枠と左→右の札番号を確認する。
+**FAIL画像はラベルを生成しない。REVIEWも未承認の仮ラベルである。**
+札が接している影響で自動検出できない場合は手動修正が必要。
+
+目視確認後に次を実行する。
+
+```powershell
+uv run python scripts/build_green20_v3.py
+```
+
+生成物は `data/datasets/green20_v3/`（val画像60枚、ラベル60ファイル、
+`data.yaml`）である。既存のv2訓練画像とラベルを参照するため、
+trainのPNGは再作成しない。v2もv3も手元のPCに必要。
+v3出力が既にある場合は、安全のため自動的な削除・上書きはしない。
+v2のval20枚は比較用に残す。
+
+## 決まり字付きの推論
+
+`green20_cards.csv` の `decision_prefix` 列を読み、札番号・決まり字・信頼度を
+推論結果のPNGおよびCSVに出力する。
+
+```powershell
+uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_01/weights/best.pt --source data/raw/green20/test/competition --imgsz 1280 --conf 0.25
+```
+
+出力先は `runs/green20_labeled/`。札番号と決まり字は推論結果であり、正解の保証はない。
+日本語を画像に描くにはPillowとCJKフォント（Windowsならメイリオ等）が必要。
+
+## 競技配置 test の撮影
+
+整列した競技配置と散らし配置はフォルダを分け、モデル設定を決めた後の未使用画像
+のみを独立testとして使う。すでに推論に使用した `competition_001.png` は
+開発用として扱う。評価には各画像内の全札の正解クラスとBBoxが別途必要。
