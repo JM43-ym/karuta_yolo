@@ -46,7 +46,7 @@ def main():
     parser.add_argument("--device",default="0")
     parser.add_argument("--check-geometry",action="store_true",
                         help="Evaluate card corners against 52x73mm physical ratio")
-    parser.add_argument("--ratio-tolerance",type=float,default=0.15)
+    parser.add_argument("--ratio-tolerance",type=float,default=0.10)
     parser.add_argument("--min-geometry-iou",type=float,default=0.30)
     parser.add_argument("--max-cards",type=int,default=20,
                         help="Maximum predictions per image, not a target")
