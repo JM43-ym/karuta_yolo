@@ -3,7 +3,7 @@
 Example:
  uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_01/weights/best.pt --source data/raw/green20/test/competition --imgsz 1280 --conf 0.25
 
-Requires Pillow for Japanese image labels (usually included with Ultralytics).
+Requires Pillow for Japanese image labels (usually included with Ultralytics).\nUse --labels-dir to write a separate *_gt.png with correct card IDs and prefixes.
 """
 from __future__ import annotations
 
@@ -42,6 +42,8 @@ def main():
     parser.add_argument("--imgsz",type=int,default=1280)
     parser.add_argument("--conf",type=float,default=0.25)
     parser.add_argument("--device",default="0")
+    parser.add_argument("--labels-dir",type=Path,default=None,
+                        help="YOLO ground-truth labels folder (save extra *_gt.png for validation)")
     args=parser.parse_args()
     with METADATA.open(encoding="utf-8-sig",newline="") as f:
         cards=list(csv.DictReader(f))
@@ -87,6 +89,36 @@ def main():
                                  confidence=f"{conf:.5f}",x0=round(x0,1),y0=round(y0,1),
                                  x1=round(x1,1),y1=round(y1,1)))
                 print(f"{name}: {card} ({prefix}) {conf:.1%}")
+        if args.labels_dir is not None:
+            gt_path=args.labels_dir/(Path(name).stem+".txt")
+            if not gt_path.is_file():
+                raise FileNotFoundError(f"Ground-truth label missing: {gt_path}")
+            gt_img=Image.fromarray(cv2.cvtColor(original,cv2.COLOR_BGR2RGB))
+            gt_draw=ImageDraw.Draw(gt_img)
+            hh,ww=original.shape[:2]
+            for line in gt_path.read_text(encoding="utf-8").splitlines():
+                fields=line.split()
+                if len(fields)!=5:
+                    raise ValueError(f"Invalid YOLO label in {gt_path}: {line}")
+                cls=int(fields[0])
+                if cls not in lookup:
+                    raise ValueError(f"Unknown ground-truth class {cls}: {gt_path}")
+                cx,cy,bw,bh=map(float,fields[1:])
+                x0=(cx-bw/2)*ww
+                y0=(cy-bh/2)*hh
+                x1=(cx+bw/2)*ww
+                y1=(cy+bh/2)*hh
+                gt_draw.rectangle((x0,y0,x1,y1),outline=(0,220,80),width=3)
+                if font is not None:
+                    card,prefix=lookup[cls]
+                    caption=f"GT {card} ({prefix})"
+                    tx,ty=max(0,int(x0)),max(0,int(y0)-34)
+                    rect=gt_draw.textbbox((tx,ty),caption,font=font)
+                    gt_draw.rectangle((rect[0]-2,rect[1]-2,rect[2]+3,rect[3]+3),fill=(0,0,0))
+                    gt_draw.text((tx,ty),caption,font=font,fill=(255,255,255))
+            gt_target=out/(Path(name).stem+"_gt.png")
+            gt_img.save(gt_target)
+            print(f"Saved ground truth: {gt_target}")
         target=out/(Path(name).stem+"_pred.png")
         image.save(target)
         print(f"Saved: {target}")
