@@ -3,7 +3,7 @@
 Run: uv run python scripts/auto_annotate.py
      uv run python scripts/auto_annotate.py --output data/annotations/green20_h01_s01_outer_review
      uv run python scripts/auto_annotate.py --session s02
-Images stay unchanged. Outer GREEN border is the target, not the white face.
+Images stay unchanged. Green border is ESTIMATED by expanding the white face.
 Inspect previews before using any labels for training.
 """
 from __future__ import annotations
@@ -36,46 +36,44 @@ def save_image(path: Path, image: np.ndarray) -> None:
     encoded.tofile(str(path))
 
 
-def candidate_rects(image: np.ndarray) -> list[tuple[float, np.ndarray, str]]:
-    """Find the OUTER green border only; never fall back to the white face.
+def candidate_rects(image: np.ndarray, border_width: float, border_height: float) -> list[tuple[float, np.ndarray, str]]:
+    """Detect white face then estimate outer edge with an adjustable expansion.
 
-    Contours are proposed at two saturation thresholds for difficult lighting.
-    Since the green edge is a ring, use its external contour (which includes
-    the white interior). Results are provisional and always require review.
+    NOTE: expanded rectangle is an estimate; review every preview.
     """
     height, width = image.shape[:2]
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    proposals: list[tuple[float, np.ndarray, str]] = []
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, otsu = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    bright = cv2.inRange(gray, 105, 255)
     kernel_size = max(3, round(min(height, width) * 0.012))
     if kernel_size % 2 == 0:
         kernel_size += 1
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
-
-    for saturation in (35, 20):
-        # Restrict hue to green, including a dark olive-colored border.
-        mask = cv2.inRange(hsv, (28, saturation, 18), (100, 255, 255))
+    proposals: list[tuple[float, np.ndarray, str]] = []
+    for method, mask in (("white_otsu", otsu), ("white_bright", bright)):
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:12]:
-            contour_area = cv2.contourArea(contour)
-            rect = cv2.minAreaRect(contour)
-            (cx, cy), (rw, rh), _ = rect
+            area = cv2.contourArea(contour)
+            (cx, cy), (rw, rh), theta = cv2.minAreaRect(contour)
             box_area = rw * rh
             ratio = max(rw, rh) / max(1.0, min(rw, rh))
             fraction = box_area / (width * height)
-            fill = contour_area / max(1.0, box_area)
-            # Reject tiny green fragments, non-card-shaped areas and borders
-            # that failed to form a sufficiently complete outer contour.
-            if not (0.005 <= fraction <= 0.85 and 1.15 <= ratio <= 2.3
-                    and fill >= 0.60):
+            fill = area / max(1.0, box_area)
+            if not (0.002 <= fraction <= 0.85 and 1.15 <= ratio <= 2.3 and fill >= 0.52):
                 continue
-            corners = cv2.boxPoints(rect).astype(np.float32)
-            edge = min(cx, cy, width - cx, height - cy)
-            if edge < min(width, height) * 0.012:
+            if rw <= rh:
+                ew, eh = rw * (1.0 + border_width), rh * (1.0 + border_height)
+            else:
+                ew, eh = rw * (1.0 + border_height), rh * (1.0 + border_width)
+            corners = cv2.boxPoints(((cx, cy), (ew, eh), theta)).astype(np.float32)
+            if (corners[:, 0].min() < 0 or corners[:, 1].min() < 0 or
+                    corners[:, 0].max() >= width or corners[:, 1].max() >= height):
                 continue
-            score = min(fill, 1.0) + min(fraction, 0.25) * 3
-            proposals.append((score, corners, f"outer_green_s{saturation}"))
-    return sorted(proposals, key=lambda item: item[0], reverse=True)
+            score = min(fill, 1.0) * 1.5 + min(fraction, 0.25) * 1.5
+            proposals.append((score, corners, method + "_expanded_estimate"))
+    return sorted(proposals, key=lambda p: p[0], reverse=True)
 
 def make_annotation(image: np.ndarray, corners: np.ndarray) -> tuple[float, float, float, float] | None:
     h, w = image.shape[:2]
@@ -94,12 +92,18 @@ def make_annotation(image: np.ndarray, corners: np.ndarray) -> tuple[float, floa
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--height", default="h01", choices=["h01", "h02", "h03"])
+    parser.add_argument("--border-width", type=float, default=0.10,
+                        help="Relative expansion across short side (default 0.10)")
+    parser.add_argument("--border-height", type=float, default=0.06,
+                        help="Relative expansion along long side (default 0.06)")
     parser.add_argument("--session", default="s01", help="Session ID, e.g. s01")
     parser.add_argument("--input", type=Path, default=None,
                         help="Default: data/raw/green20/top/{height}_{session}")
     parser.add_argument("--output", type=Path, default=None,
                         help="Default: data/annotations/green20_{height}_{session}")
     args = parser.parse_args()
+    if not (0 <= args.border_width <= 0.30 and 0 <= args.border_height <= 0.30):
+        parser.error("Expansion fractions must be between 0 and 0.30")
     if not re.fullmatch(r"s\d{2}", args.session):
         parser.error("--session must look like s01 or s02")
     input_dir = (args.input if args.input is not None else
@@ -136,9 +140,9 @@ def main() -> None:
                 raise ValueError("Filename has no known green20 card ID")
             if f"_top_{args.height}_{args.session}" not in path.stem:
                 raise ValueError("Filename does not match selected height/session")
-            candidates = candidate_rects(image)
+            candidates = candidate_rects(image, args.border_width, args.border_height)
             if not candidates:
-                raise ValueError("No complete green OUTER border detected; inspect source image and do not use old labels")
+                raise ValueError("No suitable white card face found; inspect source image")
             score, corners, method = candidates[0]
             xywh = make_annotation(image, corners)
             if xywh is None:
