@@ -217,3 +217,25 @@ uv run python scripts/predict_green20.py --model runs/green20/trial_04/weights/b
 `predictions.csv` を生成する。
 標準のYOLO `val_batch*_pred.jpg` と別の出力であり、標準画像を置き換えない。
 Windows環境のメイリオ等、日本語フォントが必要。
+
+## 共通の学習記録一覧CSV（追加）
+
+`scripts/train_green20.py` の学習が終了すると
+`runs/experiment_logs/training_history.csv` に1実験1行で追記する。
+Excelで開けるUTF-8 BOM付き。個別JSONと個別CSVも残す。
+
+一覧に保存する項目：学習名、開始・終了時刻、総経過時間、epochs、batch、
+imgsz、Precision、Recall、mAP、データセットパス、および
+**train/val/test 各splitの画像総数・元画像数・オフライン拡張画像数・札ラベル数**。
+trainはh01/h02/h03の画像総数と元画像・拡張画像内訳、
+valは単札・2枚・3枚配置の画像数も記録する。
+
+元画像=画像ファイル名に回転接尾辞がないか、回転角度0°の画像。
+拡張画像=ファイル名の回転接尾辞が0°以外のもの。
+これは保存済みのオフライン拡張画像の内訳であり、学習中にランダムに
+行われるaugmentationの発生回数ではない。
+現在の専用学習コマンドでは学習時の反転等を無効にしている。
+
+`data.yaml` にtestの指定がないときは、test枚数は**空欄（未設定）**。
+競技配置画像で独立に実行した推論枚数と混同しない。
+旧実験のログは自動的に一覧へ遡及追記されない。
