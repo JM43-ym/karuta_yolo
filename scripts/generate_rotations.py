@@ -1,6 +1,6 @@
 """Build green20 YOLO Detect training and validation sets.
 
-Training: independently photographed s01, rotated 0..355 degrees in 5 degree steps.
+Training: h01_s01, h02_s01 and h03_s01; rotate 0..355 in 5 degree steps.
 Validation: independently photographed s02, unchanged.
 No test data is used here. Keep future multi-card competition photos untouched for test.
 
@@ -9,7 +9,7 @@ Commands:
     uv run python scripts/generate_rotations.py --overwrite
 
 IMPORTANT: Review every source annotation and its preview before running.
-Generated 1440 PNG files can take considerable disk space.
+Generated 4320 PNG files can take considerable disk space.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data/raw/green20/top"
 ANNOTATIONS = ROOT / "data/annotations"
-DEFAULT_OUTPUT = ROOT / "data/datasets/green20_v1"
+DEFAULT_OUTPUT = ROOT / "data/datasets/green20_v2"
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
 HEADERS = ("filename", "card_id", "class_id", "status", "corner_points_px")
 
@@ -114,9 +114,9 @@ def write_label(path: Path, class_id: int, bbox: tuple[float, ...]) -> None:
                     encoding="utf-8")
 
 
-def session_sources(session: str) -> tuple[Path, Path, dict[str, dict[str, str]], list[Path]]:
-    source = RAW / f"h01_{session}"
-    report = ANNOTATIONS / f"green20_h01_{session}" / "report.csv"
+def session_sources(height: str, session: str) -> tuple[Path, Path, dict[str, dict[str, str]], list[Path]]:
+    source = RAW / f"{height}_{session}"
+    report = ANNOTATIONS / f"green20_{height}_{session}" / "report.csv"
     if not source.is_dir():
         raise FileNotFoundError(f"Source folder missing: {source}")
     lookup = read_report(report)
@@ -148,8 +148,8 @@ def main() -> None:
             parser.error("--overwrite is only allowed for the default generated dataset directory")
         shutil.rmtree(output)
 
-    _, _, train_rows, train_images = session_sources("s01")
-    _, _, val_rows, val_images = session_sources("s02")
+    training_sources = [(height, *session_sources(height, "s01")) for height in ("h01", "h02", "h03")]
+    _, _, val_rows, val_images = session_sources("h01", "s02")
 
     with (ROOT / "data/metadata/green20_cards.csv").open(
             "r", encoding="utf-8-sig", newline="") as f:
@@ -158,40 +158,47 @@ def main() -> None:
     if len(cards) != 20 or len(card_to_class) != 20:
         raise ValueError("Expected 20 unique cards in mapping CSV")
 
-    # Ensure labels exist and are consistent before starting generation.
-    for session, rows, photos in (("s01", train_rows, train_images),
-                                  ("s02", val_rows, val_images)):
+    # Validate all four sessions before starting to generate files.
+    all_sources = [(height, "s01", rows, photos)
+                   for height, _, _, rows, photos in training_sources]
+    all_sources.append(("h01", "s02", val_rows, val_images))
+    for height, session, rows, photos in all_sources:
         for photo in photos:
             row = rows[photo.name]
             if int(row["card_id"]) not in card_to_class:
                 raise ValueError(f"Unknown card: {photo.name}")
             if int(row["class_id"]) != card_to_class[int(row["card_id"])]:
                 raise ValueError(f"Incorrect class for {photo.name}")
-            if f"_top_h01_{session}" not in photo.stem:
+            if f"_top_{height}_{session}" not in photo.stem:
                 raise ValueError(f"Unexpected filename: {photo.name}")
-            label = ANNOTATIONS / f"green20_h01_{session}" / "labels" / (photo.stem + ".txt")
+            label = ANNOTATIONS / f"green20_{height}_{session}" / "labels" / (photo.stem + ".txt")
             if not label.is_file():
                 raise FileNotFoundError(f"Missing source label: {label}")
+            # Fail early if the report corners cannot be converted.
+            image = load_image(photo)
+            get_corners(row, photo, image.shape)
+    print("Verified all source photographs, classes, labels and corner coordinates.")
 
     for split in ("train", "val"):
         (output / "images" / split).mkdir(parents=True, exist_ok=True)
         (output / "labels" / split).mkdir(parents=True, exist_ok=True)
 
     count = 0
-    for i, photo in enumerate(train_images, 1):
-        image = load_image(photo)
-        row = train_rows[photo.name]
-        corners = get_corners(row, photo, image.shape)
-        class_id = int(row["class_id"])
-        for angle in range(0, 360, args.step):
-            transformed_image, transformed_corners = rotation(image, corners, angle)
-            hh, ww = transformed_image.shape[:2]
-            bbox = xywh_from_corners(transformed_corners, ww, hh)
-            name = f"{photo.stem}_rot{angle:03d}"
-            save_png(output / "images/train" / f"{name}.png", transformed_image)
-            write_label(output / "labels/train" / f"{name}.txt", class_id, bbox)
-            count += 1
-        print(f"Train {i:02d}/20: {photo.name} -> {360 // args.step} images")
+    for height, _, _, train_rows, train_images in training_sources:
+        for i, photo in enumerate(train_images, 1):
+            image = load_image(photo)
+            row = train_rows[photo.name]
+            corners = get_corners(row, photo, image.shape)
+            class_id = int(row["class_id"])
+            for angle in range(0, 360, args.step):
+                transformed_image, transformed_corners = rotation(image, corners, angle)
+                hh, ww = transformed_image.shape[:2]
+                bbox = xywh_from_corners(transformed_corners, ww, hh)
+                name = f"{photo.stem}_rot{angle:03d}"
+                save_png(output / "images/train" / f"{name}.png", transformed_image)
+                write_label(output / "labels/train" / f"{name}.txt", class_id, bbox)
+                count += 1
+            print(f"Train {height} {i:02d}/20: {photo.name} -> {360 // args.step} images")
 
     for i, photo in enumerate(val_images, 1):
         image = load_image(photo)
