@@ -54,7 +54,7 @@ def extract_candidates(image:np.ndarray)->list[Candidate]:
     return selected
 
 
-def assess(pred_box,candidates:list[Candidate],ratio_tolerance:float=0.15,
+def assess(pred_box,candidates:list[Candidate],ratio_tolerance:float=0.10,
            min_iou:float=0.30):
     # An independent shape contour must align with the YOLO prediction.
     ranked=sorted(((iou(pred_box,aabb(c.corners)),c) for c in candidates),
