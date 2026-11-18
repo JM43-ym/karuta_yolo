@@ -3,7 +3,7 @@
 Example:
  uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_04
 
-Log: runs/experiment_logs/<experiment>_<date>.json and .csv
+Log: runs/experiment_logs/training_history.csv (one row per run)\nDetailed run files: runs/green20/<name>_<YYYYMMDD_HHMMSS>/
 Normal Ultralytics outputs (args.yaml, results.csv, best.pt) stay in run directory.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ import json
 import platform
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -38,7 +38,7 @@ def main() -> None:
     ap.add_argument("--imgsz",type=int,default=640)
     ap.add_argument("--device",default="0")
     ap.add_argument("--workers",type=int,default=0)
-    ap.add_argument("--name",default="trial_04")
+    ap.add_argument("--name",default="train_05",help="Experiment label (timestamp automatically added)")
     args=ap.parse_args()
     data=args.data.resolve()
     if not data.is_file():
@@ -48,10 +48,15 @@ def main() -> None:
     run_project=ROOT/"runs/green20"
     log_dir=ROOT/"runs/experiment_logs"
     log_dir.mkdir(parents=True,exist_ok=True)
-    log_file=log_dir/(f"{args.name}_{datetime.now().astimezone():%Y%m%d_%H%M%S}.json")
+    run_name=f"{args.name}_{datetime.now().astimezone():%Y%m%d_%H%M%S}"
+    run_dir=run_project/run_name
+    if run_dir.exists():
+        ap.error(f"Run folder already exists: {run_dir}. Choose another --name or try a moment later.")
+    run_dir.mkdir(parents=True,exist_ok=False)
+    log_file=run_dir/"experiment.json"
     params=dict(model=args.model,data=str(data),epochs=args.epochs,batch=args.batch,
                 imgsz=args.imgsz,device=args.device,workers=args.workers,
-                project=str(run_project),name=args.name,
+                project=str(run_project),name=run_name,
                 fliplr=0.0,flipud=0.0,degrees=0.0,shear=0.0,perspective=0.0,
                 mosaic=0.0,mixup=0.0,copy_paste=0.0)
     dataset_stats=inventory(data)
@@ -66,7 +71,7 @@ def main() -> None:
         model=YOLO(args.model)
         model.train(data=str(data),epochs=args.epochs,batch=args.batch,
                     imgsz=args.imgsz,device=args.device,workers=args.workers,
-                    project=str(run_project),name=args.name,exist_ok=False,
+                    project=str(run_project),name=run_name,exist_ok=True,
                     fliplr=0.0,flipud=0.0,degrees=0.0,
                     shear=0.0,perspective=0.0,mosaic=0.0,
                     mixup=0.0,copy_paste=0.0)
@@ -100,7 +105,7 @@ def main() -> None:
                 except (OSError,ValueError) as exc:
                     record["results_csv_warning"]=str(exc)
         log_file.write_text(json.dumps(record,ensure_ascii=False,indent=2),encoding="utf-8")
-        # Each experiment gets its own simple spreadsheet-readable CSV summary.
+        # Summary is appended only to the shared CSV; avoid duplicated per-run CSVs.
         metrics=record.get("metrics",{})
         last=record.get("last_epoch_metrics",{})
         train_stats=dataset_stats["splits"].get("train",{})
@@ -110,7 +115,7 @@ def main() -> None:
         val_groups=val_stats.get("by_group",{})
         test_stats=dataset_stats["splits"].get("test",{})
         summary={
-            "experiment":args.name,
+            "experiment":run_name,
             "log_file":str(log_file),
             "status":record["status"],
             "started_at":record["started_at"],
@@ -156,11 +161,6 @@ def main() -> None:
             ("mAP50_95","metrics/mAP50-95(B)"),
         ):
             summary[output_key]=metrics.get(metric_key,last.get(metric_key,""))
-        summary_path=log_file.with_suffix(".csv")
-        with summary_path.open("w",encoding="utf-8-sig",newline="") as f:
-            writer=csv.DictWriter(f,fieldnames=list(summary))
-            writer.writeheader()
-            writer.writerow(summary)
         # A single UTF-8 BOM CSV table for all experiments, with one row per run.
         index_path=log_dir/"training_history.csv"
         prior=[]
@@ -176,7 +176,7 @@ def main() -> None:
             writer.writerows(prior)
         print(f"Experiment history: {index_path}")
         print(f"Experiment log: {log_file}")
-        print(f"Experiment summary: {summary_path}")
+
         print("Started: "+record["started_at"])
         print("Finished: "+record["finished_at"])
         print("Elapsed: "+record["elapsed_hms"]+" ("+str(record["elapsed_seconds"])+" seconds)")
