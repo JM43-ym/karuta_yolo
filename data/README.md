@@ -251,3 +251,15 @@ valは単札・2枚・3枚配置の画像数も記録する。
 学習条件・train/val/test画像数・元画像数・オフライン拡張画像数・ラベル数・時刻・経過時間・精度指標を記録する。
 `experiment.json` は中断時の詳細調査用の小さなテキストファイルである。
 過去に作成された個別CSVや学習フォルダは自動削除しない。
+
+## 最終保存形式：モデル結果は簡潔なフォルダ名
+
+`uv run python scripts/train_green20.py --name trial_05 ...` で学習すると、
+モデル・YOLO標準の結果は **`runs/green20/trial_05/`** に保存する。
+日時はこのフォルダ名には付けない。
+
+個別ログだけを **`runs/experiment_logs/trial_05_YYYYMMDD_HHMMSS/experiment.json`**
+に保存し、全実験比較の **`runs/experiment_logs/training_history.csv`**
+にも1行追加する。個別概要CSVは作らない。
+既に同名のモデル結果フォルダがある場合は、モデルを誤って上書きしないよう
+学習を停止する。別の実験名を指定すること。
