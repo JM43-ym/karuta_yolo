@@ -136,6 +136,8 @@ def main() -> None:
             "train_h03_original":train_sources.get("h03",{}).get("original",0),
             "train_h03_augmented":train_sources.get("h03",{}).get("augmented",0),
             "val_images":val_stats.get("images",0),
+            "val_original_images":val_stats.get("original_images",0),
+            "val_augmented_images":val_stats.get("augmented_images",0),
             "val_instances":val_stats.get("instances",0),
             "val_single_images":val_groups.get("single_cards",0),
             "val_two_cards_images":val_groups.get("two_cards",0),
