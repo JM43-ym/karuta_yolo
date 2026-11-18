@@ -4,7 +4,7 @@ Example:
  uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_04
 
 Log: runs/experiment_logs/training_history.csv (one row per run)
-Detailed run files: runs/green20/<name>_<YYYYMMDD_HHMMSS>/
+Detailed log: runs/experiment_logs/<name>_<YYYYMMDD_HHMMSS>/experiment.json\nModel/results: runs/green20/<name>/
 Normal Ultralytics outputs (args.yaml, results.csv, best.pt) stay in run directory.
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ def main() -> None:
     ap.add_argument("--imgsz",type=int,default=640)
     ap.add_argument("--device",default="0")
     ap.add_argument("--workers",type=int,default=0)
-    ap.add_argument("--name",default="train_05",help="Experiment label (timestamp automatically added)")
+    ap.add_argument("--name",default="trial_05",help="YOLO results folder name (no timestamp)")
     args=ap.parse_args()
     data=args.data.resolve()
     if not data.is_file():
@@ -50,12 +50,13 @@ def main() -> None:
     run_project=ROOT/"runs/green20"
     log_dir=ROOT/"runs/experiment_logs"
     log_dir.mkdir(parents=True,exist_ok=True)
-    run_name=f"{args.name}_{datetime.now().astimezone():%Y%m%d_%H%M%S}"
+    run_name=args.name
     run_dir=run_project/run_name
     if run_dir.exists():
-        ap.error(f"Run folder already exists: {run_dir}. Choose another --name or try a moment later.")
-    run_dir.mkdir(parents=True,exist_ok=False)
-    log_file=run_dir/"experiment.json"
+        ap.error(f"Run folder already exists: {run_dir}. Choose a new --name to avoid overwriting a trained model.")
+    detail_dir=log_dir/f"{args.name}_{datetime.now().astimezone():%Y%m%d_%H%M%S}"
+    detail_dir.mkdir(parents=True,exist_ok=False)
+    log_file=detail_dir/"experiment.json"
     params=dict(model=args.model,data=str(data),epochs=args.epochs,batch=args.batch,
                 imgsz=args.imgsz,device=args.device,workers=args.workers,
                 project=str(run_project),name=run_name,
@@ -72,7 +73,7 @@ def main() -> None:
         model=YOLO(args.model)
         model.train(data=str(data),epochs=args.epochs,batch=args.batch,
                     imgsz=args.imgsz,device=args.device,workers=args.workers,
-                    project=str(run_project),name=run_name,exist_ok=True,
+                    project=str(run_project),name=run_name,exist_ok=False,
                     fliplr=0.0,flipud=0.0,degrees=0.0,
                     shear=0.0,perspective=0.0,mosaic=0.0,
                     mixup=0.0,copy_paste=0.0)
