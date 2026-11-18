@@ -35,3 +35,11 @@ uv run python scripts/auto_annotate.py --session s02
 アノテーションはそれぞれ `data/annotations/green20_h01_s01/` と `green20_h01_s02/` に別保存されます。生成ラベルは学習前に必ず目視確認してください。
 
 詳しくは [data/README.md](data/README.md) を参照してください。同一写真を回転生成して学習・評価の両方へ混ぜないようにしてください。
+
+## 研究日記と実行時刻ログ
+
+- `research_diary.csv` は研究日記用の一覧です（Excelで開けるUTF-8 CSV）。列は「日付、開始時刻、終了時刻、作業内容、詳細、情報源、関連ファイル・コミット」。作業内容と時刻を確認してから追記してください。ChatGPTに要約を依頼した場合も、会話やGitHubから確認できない時刻は推測しないでください。
+- 日記のCSVはGitHubで管理できます。別PCで作業するときは先にPullし、編集後にCommit/Pushしてください。
+- YOLO学習は `uv run python scripts/train_green20.py --name trial_04 --epochs 30 --batch 8 --imgsz 640` で開始・終了時刻などを `runs/experiment_logs/` に保存します。
+- 決まり字付きの推論は従来どおり `uv run python scripts/predict_green20.py --model <best.ptへのパス> --source <画像またはフォルダ>` で実行でき、`runs/experiment_logs/predict_YYYYMMDD_HHMMSS_ffffff.csv` に開始・終了日時、経過時間、状態、実行コマンドを追加保存します。推論失敗・中断時も可能な範囲で記録します。
+- `runs/` はGit管理対象外です。実行ログはローカルPCに残るため、必要なものは別途バックアップしてください。研究日記のCSVとは自動同期されません。
