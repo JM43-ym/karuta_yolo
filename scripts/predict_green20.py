@@ -204,56 +204,71 @@ def main():
 
 
 def run_with_timing_log():
-    """Run inference and save one CSV record, including failures and interrupts."""
+    """Run inference and append ONE row to the shared prediction history CSV."""
     import sys
     import time
     from datetime import datetime
+    from prediction_history import append_record, import_legacy, HISTORY
 
     def now():
         return datetime.now().astimezone().isoformat(timespec="seconds")
 
-    started_at = now()
-    started_perf = time.perf_counter()
-    log_dir = ROOT / "runs/experiment_logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    file_stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
-    log_path = log_dir / f"predict_{file_stamp}.csv"
-    status = "running"
-    error = ""
+    started_at=now()
+    started_perf=time.perf_counter()
+    run_id="predict_"+datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
+    status="running"
+    error=""
     try:
         main()
-        status = "completed"
+        status="completed"
     except BaseException as exc:
-        status = "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed"
-        error = f"{type(exc).__name__}: {exc}"
+        status="interrupted" if isinstance(exc,KeyboardInterrupt) else "failed"
+        error=f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        finished_at = now()
-        elapsed = round(time.perf_counter() - started_perf, 2)
-        total = int(round(elapsed))
-        hours, remainder = divmod(total, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        record = {
-            "activity": "YOLO推論",
-            "status": status,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "elapsed_hms": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
-            "elapsed_seconds": elapsed,
-            "command": " ".join(sys.argv),
-            "error": error,
+        finished_at=now()
+        elapsed=round(time.perf_counter()-started_perf,2)
+        total=int(round(elapsed))
+        hours,remainder=divmod(total,3600)
+        minutes,seconds=divmod(remainder,60)
+        # Extract named flags for quick filtering; preserve full command as well.
+        arguments=sys.argv[1:]
+        def flag(name,default=""):
+            try:
+                i=arguments.index(name)
+                return arguments[i+1]
+            except (ValueError,IndexError):
+                return default
+        record={
+            "run_id":run_id,
+            "activity":"YOLO推論",
+            "status":status,
+            "started_at":started_at,
+            "finished_at":finished_at,
+            "elapsed_hms":f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+            "elapsed_seconds":elapsed,
+            "model":flag("--model"),
+            "source":flag("--source"),
+            "output":flag("--output","runs/green20_labeled"),
+            "imgsz":flag("--imgsz","1280"),
+            "conf":flag("--conf","0.25"),
+            "geometry_enabled":"--check-geometry" in arguments,
+            "max_cards":flag("--max-cards","20"),
+            "command":" ".join(sys.argv),
+            "error":error,
         }
         try:
-            with log_path.open("w", encoding="utf-8-sig", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=list(record))
-                writer.writeheader()
-                writer.writerow(record)
-            print(f"Prediction timing log: {log_path}")
+            # Bring prior records into the table on the first run after Pull.
+            imported,duplicate=import_legacy()
+            append_record(record)
+            print(f"Prediction history: {HISTORY}")
+            if imported or duplicate:
+                print(f"Imported {imported} legacy inference logs ({duplicate} duplicates).")
             print(f"Started: {started_at}")
             print(f"Finished: {finished_at}")
             print(f"Elapsed: {record['elapsed_hms']}")
-        except OSError as log_exc:
-            print(f"WARNING: Could not save inference timing log: {log_exc}", file=sys.stderr)
+        except (OSError,ValueError,RuntimeError) as log_exc:
+            print(f"WARNING: Could not update inference history: {log_exc}",file=sys.stderr)
 
 
 if __name__=="__main__":
