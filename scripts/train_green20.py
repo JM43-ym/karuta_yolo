@@ -108,6 +108,7 @@ def main() -> None:
         train_groups=train_stats.get("by_group",{})
         train_sources=train_stats.get("by_group_source",{})
         val_groups=val_stats.get("by_group",{})
+        test_stats=dataset_stats["splits"].get("test",{})
         summary={
             "experiment":args.name,
             "log_file":str(log_file),
@@ -139,6 +140,11 @@ def main() -> None:
             "val_single_images":val_groups.get("single_cards",0),
             "val_two_cards_images":val_groups.get("two_cards",0),
             "val_three_cards_images":val_groups.get("three_cards",0),
+            "test_configured":"test" in dataset_stats["splits"],
+            "test_images":test_stats.get("images",""),
+            "test_original_images":test_stats.get("original_images",""),
+            "test_augmented_images":test_stats.get("augmented_images",""),
+            "test_instances":test_stats.get("instances",""),
             "run_dir":record.get("run_dir",""),
         }
         for output_key,metric_key in (
