@@ -1,10 +1,11 @@
-"""Train YOLO with upright-only augmentation and write reproducible experiment log.
+"""Train YOLO on 360-degree 5-degree-step rotations without mirror flips, and log results.
 
 Example:
- uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_04
+ uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_06
 
 Log: runs/experiment_logs/training_history.csv (one row per run)
-Detailed log: runs/experiment_logs/<name>_<YYYYMMDD_HHMMSS>/experiment.json\nModel/results: runs/green20/<name>/
+Detailed log: runs/experiment_logs/<name>_<YYYYMMDD_HHMMSS>/experiment.json
+Model/results: runs/green20/<name>/
 Normal Ultralytics outputs (args.yaml, results.csv, best.pt) stay in run directory.
 """
 from __future__ import annotations
@@ -32,14 +33,14 @@ def timestamp() -> str:
 
 def main() -> None:
     ap=argparse.ArgumentParser()
-    ap.add_argument("--data",type=Path,default=ROOT/"data/datasets/green20_v4/data.yaml")
+    ap.add_argument("--data",type=Path,default=ROOT/"data/datasets/green20_v3/data.yaml")
     ap.add_argument("--model",default="yolo11n.pt")
     ap.add_argument("--epochs",type=int,default=30)
     ap.add_argument("--batch",type=int,default=8)
     ap.add_argument("--imgsz",type=int,default=640)
     ap.add_argument("--device",default="0")
     ap.add_argument("--workers",type=int,default=0)
-    ap.add_argument("--name",default="trial_05",help="YOLO results folder name (no timestamp)")
+    ap.add_argument("--name",default="trial_06",help="YOLO results folder name (no timestamp)")
     args=ap.parse_args()
     data=args.data.resolve()
     if not data.is_file():
@@ -47,6 +48,9 @@ def main() -> None:
     if args.epochs<1 or args.batch<1 or args.imgsz<32:
         ap.error("Invalid epochs, batch or imgsz")
     dataset_stats=inventory(data)
+    train_count=dataset_stats["splits"].get("train",{}).get("images",0)
+    if train_count!=4320:
+        print(f"NOTE: {train_count} train images. Expected 4320 for the original 3-height 5-degree rotation dataset.")
     run_project=ROOT/"runs/green20"
     log_dir=ROOT/"runs/experiment_logs"
     log_dir.mkdir(parents=True,exist_ok=True)
