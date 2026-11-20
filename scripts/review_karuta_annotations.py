@@ -29,7 +29,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--color", choices=COLORS, required=True)
     ap.add_argument("--session", default="s01")
-    ap.add_argument("--variant", choices=("v1", "v2", "v3"), default="v1",
+    ap.add_argument("--variant", choices=("v1", "v2", "v3", "v4"), default="v1",
                     help="v1: previous detection; v2: reflection-resistant green quad")
     args = ap.parse_args()
     with (ROOT / "data/metadata" / f"{args.color}_cards.csv").open(
