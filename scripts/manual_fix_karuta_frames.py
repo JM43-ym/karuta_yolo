@@ -1,11 +1,11 @@
 """Click four corners to repair ONLY missing video-frame labels.
 
-Default: images with no label from the specified annotation version (v3/v4).
+Shows only images missing labels from the primary video annotation pipeline.
 Click TL/TR/BR/BL (or any clockwise/counterclockwise order), then S to save.
 R resets the four points, N skips, Q/Esc exits. Existing labels untouched.
 
 Example:
-  uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction FB --variant v3
+  uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction FB
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 
 from auto_annotate import read_image, save_image, make_annotation
-from annotate_karuta_frames_v3 import order_points
+from annotate_karuta_frames import order_points
 
 ROOT = Path(__file__).resolve().parents[1]
 COLORS = ("green20", "blue20", "pink20", "yellow20", "orange20")
@@ -31,7 +31,6 @@ def main():
     ap.add_argument("--color", required=True, choices=COLORS)
     ap.add_argument("--direction", required=True, choices=("LR", "FB"))
     ap.add_argument("--session", default="s01")
-    ap.add_argument("--variant", choices=("v2", "v3", "v4"), default="v3")
     ap.add_argument("--preview-width", type=int, default=1100)
     args = ap.parse_args()
     if not re.fullmatch(r"s\d+", args.session) or args.preview_width < 300:
@@ -41,9 +40,9 @@ def main():
             encoding="utf-8-sig", newline="") as f:
         groups = {int(r["card_id"]): r["group_id"] for r in csv.DictReader(f)}
     src = ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction
-    out = ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"/f"{args.direction}_{args.variant}"
+    out = ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"/f"{args.direction}_annotated"
     if not src.is_dir() or not out.is_dir():
-        ap.error("Missing extracted images or annotation folder. Run annotation first.")
+        ap.error("Missing extracted images or annotation folder. Run annotate_karuta_frames.py first.")
     labels, previews, rectified = (out/"labels", out/"previews", out/"rectified")
     for folder in (labels, previews, rectified):
         folder.mkdir(parents=True, exist_ok=True)
