@@ -84,11 +84,11 @@ uv run --no-sync python scripts/extract_karuta_frames.py --color blue20 --direct
 uv run python scripts/extract_karuta_frames.py --color blue20 --direction FB --per-video 5
 ```
 
-録画を時間軸上でおおむね5区分し、各区間の鮮明なフレームを優先する（Laplacian分散）。
+各動画の中央付近の**映像変化量を累積**し、変化が均等に分布する位置からピントの合ったフレームを優先する（Laplacian分散）。これにより、撮影速度が異なる場合も「撮影時間が長い箇所だけに抽出画像が偏る」問題を軽減する。真の撮影角度を測定するわけではない。\n\n初期値は動画1本あたり5枚、解析間引きは1フレーム（`--sample-every 1`）。素早いスイープでも取りこぼしにくい設定。
 輪郭候補が写っている画像を優先するが**札が正しく撮れている保証はない**。抽出後は手・文字のブレ・札の欠け・過剰な類似を目視確認する。
 
 抽出画像は `card_003_LR_h01_s01_f000090.png` のように保存される。
-CSV `extraction_report.csv` に札番号、元動画、抽出フレーム番号、鮮明さ等を保存。元動画は変更しない。既存の抽出ファイルは上書きしない。
+CSV `extraction_report.csv` に札番号、元動画、抽出フレーム番号、鮮明さ等を保存。元動画は変更しない。既存の抽出ファイルは上書きしない。抽出し直したい場合は`--replace`を指定できるが、**旧ラベルが残って不一致になる可能性がある**ため、既存のアノテーションを退避し、再アノテーション・再確認してから使用する。
 
 ## 3. 仮アノテーション
 
@@ -141,3 +141,33 @@ uv run python scripts/annotate_karuta_frames.py --color blue20 --direction FB
 - 札ガイド枠のデフォルトは実測に合わせて `--guide-scale 0.52`
 
 Windowsの画面サイズによって下部ボタンが画面外に隠れるときは、起動時に `--preview-width 800` などを指定する。元動画の解像度には影響しない。
+
+## 緑20枚：動画の抽出とアノテーション確認
+
+次の操作は**カメラを接続せずに**行える（事前にLR/FB録画済みのAVIが必要）。
+
+```powershell
+# ① 動画の撮影速度の違いを考慮して、見え方と鮮明さで抽出
+uv run --no-sync python scripts/extract_karuta_frames.py --color green20 --direction LR --per-video 5
+uv run --no-sync python scripts/extract_karuta_frames.py --color green20 --direction FB --per-video 5
+
+# ② 全フレームを仮アノテーション（100クラス番号、card_id - 1）
+uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction FB
+
+# ③ LR/FBを札ごとに一覧表示するHTMLを生成
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20
+
+# ④ ブラウザで確認画面を開く（Windows）
+start data/annotations/video_frames/green20/review_gallery.html
+```
+
+確認ページは札番号（D01→D20）の順にLR・FBプレビューを並べ、YOLO矩形・四隅・対象札の有無を一覧確認できる。プレビューがない画像、ラベルがない画像、FAILは分かるように表示する。**HTMLは閲覧専用であり、修正・承認操作は行わない**。
+
+レポート：
+- `data/raw/green20/train/single/oblique/extracted/h01_s01/{LR,FB}/extraction_report.csv`
+- `data/annotations/video_frames/green20/h01_s01/{LR,FB}/annotation_report.csv`
+
+注意：古い手動修正済みラベルを上書きしない仕組み。抽出条件変更によってPNGだけ差し替わった場合は、ラベルとプレビューが一致しなくなるため再処理・全件再確認が必要。最新コードで撮影した元動画はそのまま保持する。少数の札でプレビューと元動画を見比べて、スイープ両端が撮れているか確かめる。
+
+**品質基準**：札全体が映っている・文字がブレていない・フレーム間で異なる見え方・枠が緑の外縁を適切に囲う・色内番号と札番号が一致。未確認ラベルは学習に投入しない。
