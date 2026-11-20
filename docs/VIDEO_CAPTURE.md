@@ -127,3 +127,17 @@ uv run python scripts/annotate_karuta_frames.py --color blue20 --direction FB
 - 枠の長辺はプレビュー高さの50%（初期値）。サイズ調整例：
   `uv run --no-sync python scripts/capture_karuta_video.py --color green20 --direction LR --guide-scale 0.60`
 - `--guide-scale` の範囲は `0.10` ～ `0.85`。枠は札の**初期配置の目安**で、札の位置や角度を自動的に認識して追跡するものではない
+
+### GUI操作ボタン
+
+撮影ウィンドウの映像の下に、**PREVIOUS / START REC（録画中は STOP / SAVE）/ NEXT / QUIT** の4ボタンを表示する。マウスクリックで操作でき、従来の `P/R/N/Q/Esc` キーも使用可能。
+
+- **PREVIOUS**：前の札へ（録画中は無効）
+- **START REC**：現在の札の動画撮影開始
+- **STOP / SAVE**：録画停止、AVIファイル保存およびCSVへの撮影記録
+- **NEXT**：次の札へ（録画中は無効）
+- **QUIT**：終了。録画中は先に STOP / SAVE を押すこと
+- 表示ボタン・ガイド枠・テキストは**プレビュー専用**。録画ファイルに含まれない
+- 札ガイド枠のデフォルトは実測に合わせて `--guide-scale 0.52`
+
+Windowsの画面サイズによって下部ボタンが画面外に隠れるときは、起動時に `--preview-width 800` などを指定する。元動画の解像度には影響しない。
