@@ -44,7 +44,7 @@ def main() -> None:
         parser.error(f"Folder does not exist: {folder}")
 
     with MAPPING_CSV.open(encoding="utf-8-sig", newline="") as f:
-        records = list(csv.DictReader(f))
+        records = sorted(csv.DictReader(f), key=lambda row: row["group_id"])
     if len(records) != 20 or len({r["card_id"] for r in records}) != 20:
         raise ValueError("Expected exactly 20 unique card IDs in mapping CSV")
 
