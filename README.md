@@ -43,3 +43,16 @@ uv run python scripts/auto_annotate.py --session s02
 - YOLO学習は `uv run python scripts/train_green20.py --name trial_04 --epochs 30 --batch 8 --imgsz 640` で開始・終了時刻などを `runs/experiment_logs/` に保存します。
 - 決まり字付きの推論は従来どおり `uv run python scripts/predict_green20.py --model <best.ptへのパス> --source <画像またはフォルダ>` で実行でき、`runs/experiment_logs/predict_YYYYMMDD_HHMMSS_ffffff.csv` に開始・終了日時、経過時間、状態、実行コマンドを追加保存します。推論失敗・中断時も可能な範囲で記録します。
 - `runs/` はGit管理対象外です。実行ログはローカルPCに残るため、必要なものは別途バックアップしてください。研究日記のCSVとは自動同期されません。
+
+## 動画撮影した100札のアノテーション
+
+動画アノテーションの旧試作版は整理し、緑縁・台形検出の方式に一本化しました。以下の3スクリプトが標準の流れです。
+
+```powershell
+uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction FB
+uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction FB
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20
+```
+
+5色とも`--color`を置き換えて使用できます。詳細は [動画撮影・アノテーション手順](docs/VIDEO_CAPTURE.md) を参照してください。撮影動画や学習済みの既存緑20クラス用モデルはそのまま保持します。
