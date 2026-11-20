@@ -80,6 +80,9 @@ def main():
             img_src = html.escape(safe_href(out,img),quote=True)
             source_href = html.escape(safe_href(out,source),quote=True)
             label_href = html.escape(safe_href(out,label),quote=True) if has_label else ""
+            rectified = preview.parent.parent / "rectified" / (source.stem + ".png")
+            rectified_link = (f' · <a href="{html.escape(safe_href(out,rectified),quote=True)}">射影補正</a>'
+                              if args.variant == "v2" and rectified.is_file() else "")
             status_html = html.escape(status)
             cl = "warn" if (status.startswith("FAIL") or "missing" in status or status=="NO_REPORT") else "normal"
             bits.append(
@@ -88,6 +91,7 @@ def main():
                 f'<div class="meta"><strong>{direction}</strong> · {html.escape(source.stem.split("_")[-1])}</div>'
                 f'<div class="status">{status_html}</div>'
                 + (f'<a href="{label_href}">YOLO label</a>' if has_label else '<span>NO LABEL</span>')
+                + rectified_link
                 + '</article>'
             )
         bits.append("</div></section>")
