@@ -188,3 +188,27 @@ start data/annotations/video_frames/green20/review_gallery.html
 **注意**：色内番号変更前に撮影した青・赤・黄・オレンジの動画がもしあれば、その動画の札番号が新対応表と一致するか確認し、必要なら整理してから抽出すること。緑動画は影響なし。
 
 緑20クラスの既存モデルは`D01〜D20`順のクラスID 0〜19を維持し、新しい100クラス用`class_id = card_id - 1`と混同しない。
+
+## 反射・台形対応の仮アノテーション改善版（v2）
+
+蛍光灯などの白い反射を札と誤検出したり、斜め映像で台形の札を取り損なう問題への対応として、独立した `scripts/annotate_karuta_frames_v2.py` を追加。**既存v1のラベルやプレビューは変更しない。** v2は撮影時の中央配置を前提としてROIを中央寄りに絞り、HSVの**緑の縁**を優先して札を探索する。凸四角形を推定できれば四隅を保持し、四点射影変換した診断画像も出力する。四角形推定が不安定な場合は回転矩形を暫定使用し、その旨をプレビューとレポートの `method` に残す。候補がない画像には**推測のYOLOラベルを付けず**、FAILとして確認待ちとする。
+
+緑20札の抽出PNGがある状態で以下を実行：
+
+```powershell
+uv run --no-sync python scripts/annotate_karuta_frames_v2.py --color green20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames_v2.py --color green20 --direction FB
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20 --variant v2
+start data/annotations/video_frames/green20/review_gallery_v2.html
+```
+
+v2の出力先：
+- `data/annotations/video_frames/green20/h01_s01/LR_v2/{labels,previews,rectified,annotation_report.csv}`
+- `data/annotations/video_frames/green20/h01_s01/FB_v2/{labels,previews,rectified,annotation_report.csv}`
+- `data/annotations/video_frames/green20/review_gallery_v2.html`
+
+一覧の「射影補正」リンクから四隅を長方形へ補正した画像を見られる。補正後の縦横比52:73は**出力先で設定した比率**であって検出の正しさの証明ではない。札の外枠・白色面・文字が不自然に歪むときは誤検出の可能性がある。
+
+**再実行時は既存ラベルを上書きしない。** `SKIPPED_EXISTING_LABEL` は検出結果が最新になったという意味ではない。v2をやり直すときは該当札のv2ファイルを退避・見直すこと。緑の既存20クラスモデルとv1ラベルには影響しない。
+
+これは**まだ実機画像に対して検証済みではない**仮アノテーション支援ツール。YOLOで先に札の位置を検出する方式ではなく、画像の中心付近に札がある条件に基づく。緑の境界が白飛び・影・モーションブラーで失われた場合は失敗し得る。出力は全て目視確認が必要。
