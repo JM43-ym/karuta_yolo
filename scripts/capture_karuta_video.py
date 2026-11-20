@@ -4,7 +4,7 @@ Usage:
   uv run python scripts/capture_karuta_video.py --color blue20 --direction LR
   uv run python scripts/capture_karuta_video.py --color blue20 --direction FB --start 6
 
-Keys: R start/stop this card, N next card, P previous card, Q / Esc quit.
+GUI buttons: PREVIOUS / START REC or STOP/SAVE / NEXT / QUIT.\nKeyboard shortcuts remain: R, N, P, Q / Esc.
 Nothing overwrites an existing video. See docs/VIDEO_CAPTURE.md.
 """
 from __future__ import annotations
@@ -127,6 +127,48 @@ def draw_preview(frame, label: str, recording: bool, count: int, max_width: int,
     return vis
 
 
+# Mouse-clickable controls are drawn below the preview, never onto saved frames.
+CONTROL_HEIGHT = 104
+BUTTONS = (
+    ("p", "PREVIOUS"),
+    ("r", "START / STOP"),
+    ("n", "NEXT"),
+    ("q", "QUIT"),
+)
+
+
+def button_regions(width: int, preview_height: int):
+    margin, gap = 12, 12
+    button_width = (width - 2 * margin - gap * 3) // 4
+    y0 = preview_height + 12
+    return [
+        (key, name, (margin + i * (button_width + gap), y0,
+                     margin + i * (button_width + gap) + button_width, y0 + 68))
+        for i, (key, name) in enumerate(BUTTONS)
+    ]
+
+
+def add_control_panel(preview: np.ndarray, recording: bool, index: int) -> np.ndarray:
+    height, width = preview.shape[:2]
+    panel = np.full((CONTROL_HEIGHT, width, 3), (38, 42, 48), dtype=np.uint8)
+    canvas = np.vstack((preview, panel))
+    for key, name, (x0, y0, x1, y1) in button_regions(width, height):
+        disabled = (recording and key in ("n", "p")) or (index == 0 and key == "p") or (index == 19 and key == "n")
+        color = ((66, 66, 66) if disabled else
+                 ((52, 66, 175) if recording else (50, 140, 62)) if key == "r" else
+                 (70, 90, 108) if key in ("n", "p") else (92, 65, 85))
+        cv2.rectangle(canvas, (x0, y0), (x1, y1), color, -1)
+        cv2.rectangle(canvas, (x0, y0), (x1, y1), (150, 155, 160), 1)
+        display = ("STOP / SAVE" if recording else "START REC") if key == "r" else name
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text_scale = min(0.75, max(0.37, (x1 - x0) / 195 * 0.63))
+        (tw, th), _ = cv2.getTextSize(display, font, text_scale, 2)
+        cv2.putText(canvas, display, (x0 + max(4, (x1 - x0 - tw)//2), y0 + (y1-y0+th)//2),
+                    font, text_scale, (250, 250, 250) if not disabled else (150, 150, 150),
+                    2, cv2.LINE_AA)
+    return canvas
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--color", choices=COLORS, required=True)
@@ -136,8 +178,8 @@ def main() -> None:
     parser.add_argument("--camera-index", type=int, default=0)
     parser.add_argument("--fps", type=float, default=15.0, help="AVI playback FPS; actual acquisition is logged")
     parser.add_argument("--preview-width", type=int, default=960)
-    parser.add_argument("--guide-scale", type=float, default=0.50,
-                        help="Guide long-side fraction of preview height (default: 0.50)")
+    parser.add_argument("--guide-scale", type=float, default=0.52,
+                        help="Guide long-side fraction of preview height (default: 0.52)")
     args = parser.parse_args()
     if not (1 <= args.start <= 20 and args.fps > 0 and args.preview_width >= 200
             and 0.10 <= args.guide_scale <= 0.85):
@@ -155,8 +197,23 @@ def main() -> None:
     started = 0.0
     started_iso = ""
     count = 0
+    pending_actions: list[str] = []
+    preview_geometry = [0, 0]  # width, height: mouse callback uses image pixel coords.
+
+    def on_mouse(event, x, y, flags, userdata):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+        width, preview_height = preview_geometry
+        if width <= 0 or not (preview_height <= y < preview_height + CONTROL_HEIGHT):
+            return
+        for key, _name, (x0, y0, x1, y1) in button_regions(width, preview_height):
+            if x0 <= x <= x1 and y0 <= y <= y1:
+                pending_actions.append(key)
+                return
+
     try:
         cv2.namedWindow("Karuta Capture", cv2.WINDOW_AUTOSIZE)
+        cv2.setMouseCallback("Karuta Capture", on_mouse)
         while True:
             frame = camera.read()
             row = cards[index]
@@ -166,9 +223,15 @@ def main() -> None:
             if writer is not None:
                 writer.write(frame)
                 count += 1
-            cv2.imshow("Karuta Capture", draw_preview(frame, label, writer is not None, count, args.preview_width,
-                                                       args.direction, args.guide_scale))
+            preview = draw_preview(frame, label, writer is not None, count, args.preview_width,
+                                   args.direction, args.guide_scale)
+            preview_geometry[:] = [preview.shape[1], preview.shape[0]]
+            canvas = add_control_panel(preview, writer is not None, index)
+            cv2.imshow("Karuta Capture", canvas)
             key = cv2.waitKey(1) & 0xFF
+            # Mouse actions and keyboard shortcuts use exactly the same handlers.
+            if pending_actions:
+                key = ord(pending_actions.pop(0))
             if key in (ord("q"), 27):
                 break
             if key == ord("r"):
