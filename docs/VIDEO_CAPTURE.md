@@ -117,3 +117,13 @@ uv run python scripts/annotate_karuta_frames.py --color blue20 --direction FB
 - 動画のフレームごとの見え方は角度センサーなしでは正確な度数を決められない
 - 真上h01画像を縮小してh02/h03を模擬する工程は**今回の撮影プログラムにはまだ実装していない**
 - BU160MCF実機がこの実行環境にないため、pytelicam接続・実際の録画FPS・露光の適正値はPCで確認する必要がある
+
+### 初期位置ガイド枠（2026-11-20追加）
+
+プレビューの中央に、競技かるた札の寸法比 **52 mm : 73 mm** の緑色ガイド枠と中心十字を描画する。
+- `--direction LR`：札を**縦長**に置くガイド
+- `--direction FB`：札を**横長**に置くガイド
+- ガイド枠は**表示専用**で、録画ファイルには書き込まれない
+- 枠の長辺はプレビュー高さの50%（初期値）。サイズ調整例：
+  `uv run --no-sync python scripts/capture_karuta_video.py --color green20 --direction LR --guide-scale 0.60`
+- `--guide-scale` の範囲は `0.10` ～ `0.85`。枠は札の**初期配置の目安**で、札の位置や角度を自動的に認識して追跡するものではない
