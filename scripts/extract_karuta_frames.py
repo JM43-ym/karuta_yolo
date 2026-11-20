@@ -41,6 +41,8 @@ def load_mapping(color: str):
         cards = list(csv.DictReader(f))
     if len(cards) != 20:
         raise ValueError(f"Expected 20 records for {color}")
+    # Video index karuta_01 == color-group A01/B01/etc., NOT first CSV row.
+    cards.sort(key=lambda card: card["group_id"])
     return cards
 
 
