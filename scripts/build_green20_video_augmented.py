@@ -153,23 +153,17 @@ def get_corners_from_normalized(box,shape):
 
 
 def augment_scaled(img,corners,scale,angle):
-    # Affine similarity centered on image, expand canvas sufficiently to
-    # preserve the whole scaled image and every transformed card corner.
+    # Keep the image canvas FIXED. Scaling the whole canvas along with the
+    # card would cancel the intended apparent-size augmentation.
     h,w=img.shape[:2]
     mat=cv2.getRotationMatrix2D((w/2,h/2),angle,scale)
-    image_corners=np.float32([[0,0],[w,0],[w,h],[0,h]])
-    transformed_frame=cv2.transform(image_corners[None,:,:],mat)[0]
-    low=transformed_frame.min(axis=0)
-    high=transformed_frame.max(axis=0)
-    target_w=max(1,int(math.ceil(high[0]-low[0])))
-    target_h=max(1,int(math.ceil(high[1]-low[1])))
-    mat[0,2]-=low[0]
-    mat[1,2]-=low[1]
-    out=cv2.warpAffine(img,mat,(target_w,target_h),
-                       flags=cv2.INTER_LINEAR,borderMode=cv2.BORDER_CONSTANT,
-                       borderValue=(0,0,0))
     new_pts=cv2.transform(corners.reshape(1,4,2),mat)[0]
-    bbox=xywh_from_corners(new_pts,target_w,target_h)
+    # Never write labels for truncated cards.
+    bbox=xywh_from_corners(new_pts,w,h)
+    out=cv2.warpAffine(img,mat,(w,h),
+                       flags=cv2.INTER_LINEAR,
+                       borderMode=cv2.BORDER_CONSTANT,
+                       borderValue=(0,0,0))
     return out,bbox
 
 
