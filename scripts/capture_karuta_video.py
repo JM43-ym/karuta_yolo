@@ -43,12 +43,14 @@ class TeliCamera:
             if not (0 <= index < n):
                 raise RuntimeError(f"Camera index {index} invalid; TeliCamSDK detects {n} cameras")
             # SDK defaults to the first discovered device when index=0.
-            try:
-                self.device = self.system.create_device_object(index)
-            except TypeError:
-                if index != 0:
-                    raise RuntimeError("This pytelicam version does not support nonzero --camera-index")
+            if index == 0:
+                # Standard pytelicam example uses the default first camera.
                 self.device = self.system.create_device_object()
+            else:
+                try:
+                    self.device = self.system.create_device_object(index)
+                except TypeError as exc:
+                    raise RuntimeError("This pytelicam version does not support nonzero --camera-index") from exc
             self.device.open()
             self.device.cam_stream.open()
             self.device.cam_stream.start()
