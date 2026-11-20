@@ -46,14 +46,14 @@ data/annotations/video_frames/blue20/h01_s01/
 uv pip install "C:\path\to\pytelicam-<version>-cp311-cp311-win_amd64.whl"
 ```
 
-実際のwheelファイル名に置き換えること。pytelicamはメーカーSDKのため、通常の依存リストに勝手に追加していない。**TeliViewerとPythonアプリが同時にカメラを開くと競合する場合があるので、撮影前にTeliViewerを閉じる。**
+実際のwheelファイル名に置き換えること。pytelicamはメーカーSDKのため、通常の依存リストに勝手に追加していない。メーカーwheelを仮想環境へ直接追加した後は、`uv run --no-sync` を使う（通常の`uv run`は環境を再同期する場合がある）。**TeliViewerとPythonアプリが同時にカメラを開くと競合する場合があるので、撮影前にTeliViewerを閉じる。**
 
 公式資料： https://www.toshiba-teli.co.jp/products/industrial-camera/software-telicamsdk.htm
 
 ## 1. 動画を撮影する
 
 ```powershell
-uv run python scripts/capture_karuta_video.py --color blue20 --direction LR
+uv run --no-sync python scripts/capture_karuta_video.py --color blue20 --direction LR
 uv run python scripts/capture_karuta_video.py --color blue20 --direction FB
 ```
 
@@ -80,7 +80,7 @@ uv run python scripts/capture_karuta_video.py --color blue20 --direction LR --st
 ## 2. 動画から数フレームを抽出する
 
 ```powershell
-uv run python scripts/extract_karuta_frames.py --color blue20 --direction LR --per-video 5
+uv run --no-sync python scripts/extract_karuta_frames.py --color blue20 --direction LR --per-video 5
 uv run python scripts/extract_karuta_frames.py --color blue20 --direction FB --per-video 5
 ```
 
@@ -93,7 +93,7 @@ CSV `extraction_report.csv` に札番号、元動画、抽出フレーム番号�
 ## 3. 仮アノテーション
 
 ```powershell
-uv run python scripts/annotate_karuta_frames.py --color blue20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames.py --color blue20 --direction LR
 uv run python scripts/annotate_karuta_frames.py --color blue20 --direction FB
 ```
 
