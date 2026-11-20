@@ -149,9 +149,9 @@ def main():
     images=sorted(src.glob("*.png"))
     if not images:
         ap.error(f"No PNG frames in {src}")
-    labels,previews=out/"labels",out/"previews"
-    labels.mkdir(parents=True,exist_ok=True)
-    previews.mkdir(parents=True,exist_ok=True)
+    labels,previews,rectified=out/"labels",out/"previews",out/"rectified"
+    for folder in (labels,previews,rectified):
+        folder.mkdir(parents=True,exist_ok=True)
     rows=[]
     for path in images:
         record=dict.fromkeys(FIELDS,"")
@@ -197,6 +197,21 @@ def main():
                 cv2.rectangle(vis,(xa,ya),(xb,yb),(255,210,0),2)
                 cv2.putText(vis,f"{lookup[cid]} / {cid:03d} / {method} / REVIEW",
                             (12,38),cv2.FONT_HERSHEY_SIMPLEX,.62,(0,0,255),2)
+                # A diagnostic rectified view of the estimated four corners.
+                # Width:height is an ASSUMED output shape, not measured evidence
+                # that the proposal is geometrically correct.
+                quad=order_points(corners)
+                target_w,target_h=((520,730) if args.direction=="LR" else (730,520))
+                destination=np.float32([[0,0],[target_w-1,0],
+                                        [target_w-1,target_h-1],[0,target_h-1]])
+                mat=cv2.getPerspectiveTransform(quad,destination)
+                warp=cv2.warpPerspective(img,mat,(target_w,target_h))
+                warp_path=rectified/(path.stem+".png")
+                if not warp_path.exists():
+                    ok,encoded=cv2.imencode(".png",warp)
+                    if not ok:
+                        raise ValueError("Failed encoding rectified preview")
+                    encoded.tofile(str(warp_path))
             hh,ww=vis.shape[:2]
             shrink=min(1.,1100/max(hh,ww))
             if shrink<1:
