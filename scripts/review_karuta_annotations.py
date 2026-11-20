@@ -29,22 +29,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--color", choices=COLORS, required=True)
     ap.add_argument("--session", default="s01")
-    ap.add_argument("--variant", choices=("v1", "v2", "v3", "v4"), default="v1",
-                    help="v1: previous detection; v2: reflection-resistant green quad")
     args = ap.parse_args()
     with (ROOT / "data/metadata" / f"{args.color}_cards.csv").open(
             encoding="utf-8-sig", newline="") as f:
         cards = list(csv.DictReader(f))
     out = ROOT / "data/annotations/video_frames" / args.color
     out.mkdir(parents=True, exist_ok=True)
-    target = out / (f"review_gallery_{args.variant}.html" if args.variant != "v1" else "review_gallery.html")
+    target = out / "review_gallery.html"
     entries = []
     for card in cards:
         cid = int(card["card_id"])
         for direction in ("LR", "FB"):
             frames = (ROOT / "data/raw" / args.color / "train/single/oblique/extracted" /
                       f"h01_{args.session}" / direction)
-            annotations = out / f"h01_{args.session}" / (direction + "_" + args.variant if args.variant != "v1" else direction)
+            annotations = out / f"h01_{args.session}" / (direction + "_annotated")
             preview_dir = annotations / "previews"
             label_dir = annotations / "labels"
             report = annotations / "annotation_report.csv"
@@ -82,7 +80,7 @@ def main():
             label_href = html.escape(safe_href(out,label),quote=True) if has_label else ""
             rectified = preview.parent.parent / "rectified" / (source.stem + ".png")
             rectified_link = (f' · <a href="{html.escape(safe_href(out,rectified),quote=True)}">射影補正</a>'
-                              if args.variant in ("v2", "v3") and rectified.is_file() else "")
+                              if rectified.is_file() else "")
             status_html = html.escape(status)
             cl = "warn" if (status.startswith("FAIL") or "missing" in status or status=="NO_REPORT") else "normal"
             bits.append(
@@ -111,7 +109,7 @@ article img{width:100%;height:160px;object-fit:contain;background:#e8ebed}
 .status{font-weight:600}
 </style></head><body>
 """
-    doc += f"<h1>{html.escape(args.color)} アノテーション確認一覧 ({args.variant})</h1>"
+    doc += f"<h1>{html.escape(args.color)} アノテーション確認一覧</h1>"
     doc += (f"<p>合計 {len(entries)} フレーム / 撮影未検出の札×方向 {missing} 件。"
             f"各画像をクリックすると元PNGを開きます。<br>状態: {summary or 'まだ抽出画像なし'}</p>")
     doc += ("<p><b>注意：</b>プレビューの四隅・外接枠・札番号を目視で確認してください。"
