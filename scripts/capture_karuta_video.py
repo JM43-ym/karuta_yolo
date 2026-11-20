@@ -96,6 +96,8 @@ def load_cards(color: str) -> list[dict[str, str]]:
         rows = list(csv.DictReader(file))
     if len(rows) != 20:
         raise ValueError(f"Expected 20 mapping rows in {csv_path}")
+    # CSV is sorted by competitive karuta ID; shooting order is group_id A01..A20.
+    rows.sort(key=lambda row: row["group_id"])
     return rows
 
 
