@@ -239,3 +239,12 @@ results/
 data/annotations/**/*.jpg
 data/annotations/**/*.txt
 data/annotations/**/*.csv
+
+# Raw per-card camera captures and extraction reports (local only)
+data/raw/**/*.avi
+data/raw/**/*.mp4
+data/raw/**/*.mov
+data/raw/**/*.mkv
+data/raw/**/capture_index.csv
+data/raw/**/extraction_report.csv
+data/annotations/video_frames/
