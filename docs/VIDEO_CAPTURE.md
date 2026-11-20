@@ -245,3 +245,21 @@ start data/annotations/video_frames/green20/review_gallery_v4.html
 `--max-track-frames 160` （初期値）は、起点フレームから何フレーム以内まで追跡するかの上限。速度・ブレ・特徴点不足で追跡が失敗した場合は手動補正が必要。
 
 **撮影済み5色の処理順序**：①各色LR/FBでフレーム抽出 ②v4アノテーション ③v4確認HTML ④札番号・外枠・射影補正を目視レビュー。20札×2方向×5枚＝1色あたり最大200枚、5色で最大1000枚。元AVIや既存ラベルは上書きしない。動画数・抽出数は必ずローカルで実測確認すること。v4は実機撮影ファイルでの動作・精度検証前であり、学習にはレビュー済みのラベルのみ使用。
+
+## v4でLRがNO_REPORT、FB端がFAILになった場合
+
+`NO_REPORT` は**検出失敗ではなく、その版の報告CSVに画像行がない**ことを意味する。LR側のv4を実行していない場合も表示される。片方向だけ実行して作ったギャラリーでは、もう一方は全件NO_REPORTになる。
+
+**今回の推奨運用：v3の検出済み画像を維持し、FAILだけ手動で四隅を指定して補修する。** v4の動画追跡は一部の端フレームで失敗したため、そのまま自動生成ラベルを学習へ流し込まないこと。
+
+```powershell
+# v3のFB未検出だけをマウス操作で補修（撮影動画の再処理は不要）
+uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction FB --variant v3
+# ギャラリー再生成
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20 --variant v3
+start data/annotations/video_frames/green20/review_gallery_v3.html
+```
+
+マウスで緑枠の外側の四隅を順番にクリックする。順番は時計回りまたは反時計回りでよい。キー：`S` 保存／次、`R` 4点リセット、`N` スキップ、`Q` またはEsc 終了。ラベルがすでにある画像は**修正対象に含めない**。補修後の状態は `MANUAL_REVIEW` として記録する（手動入力も必ず再確認）。
+
+v4の方を補修したい場合は `--variant v4` を指定する。ただしその方向のv4アノテーション出力フォルダがあることが前提。v1、学習済みモデル、元動画、他のバージョンは変更しない。
