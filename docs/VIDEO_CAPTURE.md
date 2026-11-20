@@ -96,3 +96,22 @@ start data/annotations/video_frames/green20/review_gallery.html
 - 過去のアノテーション版（v1/v2/v4）のスクリプトはGitHubから削除したが、ローカルの`data/annotations/video_frames/`内に残る旧フォルダは、内容確認・バックアップ後に整理すること。誤って新しい`LR_annotated`/`FB_annotated`を消さないこと。
 - 既存の抽出PNGを変更すると、付随するアノテーションがずれるため、抽出やり直し前に別途バックアップする。
 - 1本の動画から得た画像をtrainとval/testに分けない。最終学習用の100クラスデータセットへの組み込みは**全件レビュー後**に行う。
+
+## 次の緑20クラス学習：Val固定角度画像のリネーム
+
+学習セット目標：Train 8,520枚（LR 100、FB 100、s01正面20を3倍率で拡張。LR/FBは−15～+15°を5°刻み、正面は0～355°を5°刻み）。Val 180枚（以前のL/R/F/B 30°・45°を各20枚、別撮影s02正面20枚）。**Valに回転・拡縮は適用しない。** 現時点では予定枚数であり、元画像・アノテーション・倍率実測値の確認前に自動生成したものではない。
+
+各固定角度の画像がまだリネームされていない場合は `scripts/rename_green20_val_angles.py` を使用。フォルダは**ローカルの実際の保存先**を `--folder` に指定する。
+
+```powershell
+# F30の例。実際のフォルダパスに置き換える
+uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30"
+# 20枚の並びが緑D01～D20で正しいことを画像で確認した後のみ
+uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30" --apply --confirm-order
+```
+
+角度は `L30 L45 R30 R45 F30 F45 B30 B45` の8種類。同一スクリプトで任意の1角度を扱う。**ファイル名の自然順がD01～D20と一致するという仮定**で名称案を出すだけで、画像内容から札番号を識別するわけではない。順序が違う場合は `--apply` しない。既存ファイルへの上書きは禁止している。リネームが終わったら各角度に対応するYOLOラベルを目視確認のうえで用意する。
+
+**s02正面画像について**：以前の`generate_rotations.py`は `h01_s02` があればそれを、なければ `h03_s02` を参照する。正面写真の保存場所と既存アノテーションを確認したうえで採用する。
+
+**倍率について**：h01/h02/h03の札の画像内の見かけの寸法から倍率を求める。値が確認できないうちは仮の倍率でデータセットを生成しない。元のTrain/Valを分離してからTrainのみ拡張し、Testは学習に使用しない。
