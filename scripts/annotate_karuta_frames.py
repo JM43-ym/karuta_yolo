@@ -218,6 +218,11 @@ def main():
     labels,previews,rectified=out/"labels",out/"previews",out/"rectified"
     for folder in (labels,previews,rectified):
         folder.mkdir(parents=True,exist_ok=True)
+    report=out/"annotation_report.csv"
+    previous={}
+    if report.is_file():
+        with report.open(encoding="utf-8-sig",newline="") as file:
+            previous={row["image"]:row for row in csv.DictReader(file)}
     rows=[]
     for path in images:
         record=dict.fromkeys(FIELDS,"")
@@ -233,8 +238,13 @@ def main():
                 raise ValueError("Card not in mapping CSV")
             record.update(card_id=f"{cid:03d}",group_id=lookup[cid],class_id=str(cid-1))
             if label.exists():
-                record["status"]="SKIPPED_EXISTING_LABEL"
-                # Build preview only if missing? Avoid overwriting reviewed preview.
+                # Keep manual corrections and previous review details on reruns.
+                old=previous.get(path.name)
+                if old and old.get("status") in ("REVIEW","MANUAL_REVIEW","SKIPPED_EXISTING_LABEL"):
+                    record.update({key:old.get(key,"") for key in FIELDS})
+                    record["status"]=old.get("status") if old.get("status")!="SKIPPED_EXISTING_LABEL" else "REVIEW"
+                else:
+                    record["status"]="SKIPPED_EXISTING_LABEL"
                 rows.append(record)
                 continue
             img=read_image(path)
