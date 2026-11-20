@@ -228,3 +228,20 @@ start data/annotations/video_frames/green20/review_gallery_v3.html
 - 比較：v1/v2のラベルとプレビューを保存したまま、v3の結果を別のHTMLで確認できる
 - 注意：自動判定で検出できない場合はFAILを残す。無理にラベルを付けない。全件目視で確認すること
 - v3は一部の途切れた緑縁に対応する**暫定実装**であり、撮影済み全フレームでの検証はまだ実施していない
+
+## v4：動画フレーム追跡によるFB両端の補完（追加）
+
+v3で緑縁検出に失敗したフレームは、**同じカード・同じ方向の元AVI動画**から、近くの成功フレームを起点として補完を試みる。札の内側の特徴点をLucas–Kanade光フローで追跡し、RANSACホモグラフィーで台形の四隅を更新する。品質条件（追跡点数、再投影誤差、札の面積・位置）が満たされない場合は `FAIL` を残す。動画から読み取った実画像間の追跡なので、一定速度で撮影したことを前提としない。
+
+```powershell
+uv run --no-sync python scripts/annotate_karuta_frames_v4.py --color green20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames_v4.py --color green20 --direction FB
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20 --variant v4
+start data/annotations/video_frames/green20/review_gallery_v4.html
+```
+
+前提：`data/raw/<color>/train/single/oblique/videos/h01_s01/{LR,FB}/karuta_XX_*.avi` が存在すること。抽出済みPNGだけでなく、**元動画**が必要。v4出力は `LR_v4` / `FB_v4`、v1〜v3を変更しない。
+
+`--max-track-frames 160` （初期値）は、起点フレームから何フレーム以内まで追跡するかの上限。速度・ブレ・特徴点不足で追跡が失敗した場合は手動補正が必要。
+
+**撮影済み5色の処理順序**：①各色LR/FBでフレーム抽出 ②v4アノテーション ③v4確認HTML ④札番号・外枠・射影補正を目視レビュー。20札×2方向×5枚＝1色あたり最大200枚、5色で最大1000枚。元AVIや既存ラベルは上書きしない。動画数・抽出数は必ずローカルで実測確認すること。v4は実機撮影ファイルでの動作・精度検証前であり、学習にはレビュー済みのラベルのみ使用。
