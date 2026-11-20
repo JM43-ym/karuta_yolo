@@ -115,3 +115,29 @@ uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folde
 **s02正面画像について**：以前の`generate_rotations.py`は `h01_s02` があればそれを、なければ `h03_s02` を参照する。正面写真の保存場所と既存アノテーションを確認したうえで採用する。
 
 **倍率について**：h01/h02/h03の札の画像内の見かけの寸法から倍率を求める。値が確認できないうちは仮の倍率でデータセットを生成しない。元のTrain/Valを分離してからTrainのみ拡張し、Testは学習に使用しない。
+
+## 緑20クラスの次回Val固定角度画像：自動ラベル作成（160枚）
+
+8方向の画像（`L30,L45,R30,R45,F30,F45,B30,B45`）が以下にあり、各フォルダ20枚、`card_008_F30_s02.png`のように**リネーム済み**であることが前提。
+
+`data/raw/green20/train/single/oblique/h01_s01/<角度>/`
+
+固定角度画像の自動アノテーションには、**動画用とは別の** `scripts/annotate_green20_val_angles.py` を使用します。バージョン切り替えはありません。8方向まとめて実行できます。
+
+```powershell
+# 8方向すべての自動ラベル作成
+uv run --no-sync python scripts/annotate_green20_val_angles.py
+# HTMLで結果を確認
+uv run --no-sync python scripts/annotate_green20_val_angles.py --review
+start data/annotations/green20_fixed_angle_val/review_gallery.html
+# 未検出のF30だけをクリックで補修する例
+uv run --no-sync python scripts/annotate_green20_val_angles.py --angle F30 --fix-missing
+# 修正後に再生成
+uv run --no-sync python scripts/annotate_green20_val_angles.py --review
+```
+
+出力先は `data/annotations/green20_fixed_angle_val/<角度>/{labels,previews,annotation_report.csv}`。**元画像と既存ラベルを上書きしない。** ラベルは緑20クラス0～19（動画用100クラスラベルとは異なる）。`REVIEW`と`MANUAL_REVIEW`は未承認であり、必ず外枠・札番号を全件目視確認する。
+
+**重要**：元画像は現在`train/h01_s01`に保存され、ファイル名に`s02`を付けたことは独立したs02撮影を意味しない。今回の動画Trainと撮影元が違うことを確認できた場合にのみValへ採用する。従来モデルのTrainに使っていた場合、その従来モデルの独立評価には使用しない。正面Valのs02は別途20枚用意し、合わせて180枚にする。
+
+今回のスクリプトはローカルの160枚の実画像ではまだ検証していません。FAILが多いときは、むやみに誤ラベルを増やすより検出条件の見直しまたはクリック補修を行ってください。
