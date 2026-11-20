@@ -99,10 +99,26 @@ def load_cards(color: str) -> list[dict[str, str]]:
     return rows
 
 
-def draw_preview(frame, label: str, recording: bool, count: int, max_width: int):
+def draw_preview(frame, label: str, recording: bool, count: int, max_width: int,
+                 direction: str, guide_scale: float):
     h, w = frame.shape[:2]
     scale = min(1.0, max_width / w)
     vis = cv2.resize(frame, (round(w * scale), round(h * scale))) if scale < 1 else frame.copy()
+    # The guide is display-only. The actual AVI receives the unmodified frame.
+    # Standard karuta card dimensions: 52 x 73 mm (short : long = 52 : 73).
+    vh, vw = vis.shape[:2]
+    long_side = round(min(vh * guide_scale, vw * 0.80))
+    short_side = round(long_side * 52 / 73)
+    box_w, box_h = (short_side, long_side) if direction == "LR" else (long_side, short_side)
+    cx, cy = vw // 2, vh // 2
+    x0, y0 = cx - box_w // 2, cy - box_h // 2
+    x1, y1 = x0 + box_w, y0 + box_h
+    guide_color = (0, 255, 0)  # bright green (BGR)
+    cv2.rectangle(vis, (x0, y0), (x1, y1), guide_color, 2)
+    cv2.drawMarker(vis, (cx, cy), guide_color, cv2.MARKER_CROSS, 16, 1)
+    cv2.putText(vis, f"INITIAL CARD POSITION 52:73 ({direction})",
+                (max(5, x0), max(82, y0 - 9)), cv2.FONT_HERSHEY_SIMPLEX,
+                0.43, guide_color, 1, cv2.LINE_AA)
     cv2.rectangle(vis, (0, 0), (vis.shape[1], 70), (30, 30, 30), -1)
     cv2.putText(vis, label, (14, 27), cv2.FONT_HERSHEY_SIMPLEX, 0.57, (245, 245, 245), 2)
     cv2.putText(vis, f"{'REC' if recording else 'READY'}  {count} frames  |  R: record/stop  N/P: card  Q: quit",
@@ -120,8 +136,11 @@ def main() -> None:
     parser.add_argument("--camera-index", type=int, default=0)
     parser.add_argument("--fps", type=float, default=15.0, help="AVI playback FPS; actual acquisition is logged")
     parser.add_argument("--preview-width", type=int, default=960)
+    parser.add_argument("--guide-scale", type=float, default=0.50,
+                        help="Guide long-side fraction of preview height (default: 0.50)")
     args = parser.parse_args()
-    if not (1 <= args.start <= 20 and args.fps > 0 and args.preview_width >= 200):
+    if not (1 <= args.start <= 20 and args.fps > 0 and args.preview_width >= 200
+            and 0.10 <= args.guide_scale <= 0.85):
         parser.error("Invalid --start / --fps / --preview-width")
     if not args.session.startswith("s") or not args.session[1:].isdigit():
         parser.error("--session must be like s01")
@@ -147,7 +166,8 @@ def main() -> None:
             if writer is not None:
                 writer.write(frame)
                 count += 1
-            cv2.imshow("Karuta Capture", draw_preview(frame, label, writer is not None, count, args.preview_width))
+            cv2.imshow("Karuta Capture", draw_preview(frame, label, writer is not None, count, args.preview_width,
+                                                       args.direction, args.guide_scale))
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
