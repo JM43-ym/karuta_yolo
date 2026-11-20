@@ -1,0 +1,119 @@
+# BU160MCF：五色百人一首の動画撮影・抽出・ラベル作成
+
+## 決定した管理方式
+
+- 撮影用のraw画像は五色ごと：`green20`, `blue20`, `pink20`（赤/B）, `yellow20`, `orange20`
+- 単札の真上画像は `h01_s01` の1条件
+- 斜め画像は「左右に往復する LR」と「手前・奥に往復する FB」の **2動画/札**
+- 色内番号（例：A01）と競技かるたの札番号（例：003）は `data/metadata/<color>_cards.csv` で対応
+- 連続動画から複数の見え方を抽出するが、**抽出フレームに正確な角度は付けない**
+- 既存の緑20札30°/45°実写は、学習に使わない独立セットであれば評価に利用できる
+- 現在の`green20_v2/v3/v4`と学習済みモデルは変更しない。新しい抽出画像を学習へ組み込むには、レビュー後に別のデータセットを生成する工程が必要
+
+## フォルダ（すべての色で共通）
+
+```text
+data/raw/blue20/
+  train/
+    single/
+      top/h01_s01/                              # karuta_1.png など単札実写
+      oblique/
+        videos/h01_s01/
+          LR/                                    # karuta_01_LR.avi ...
+          FB/                                    # karuta_01_FB.avi ...
+        extracted/h01_s01/
+          LR/                                    # card_003_LR_h01_s01_f000090.png ...
+          FB/
+    multi/{scattered,touching}/
+    conditions/{lighting,background}/
+  val/                                         # 独立撮影画像
+  test/                                        # 最終評価用の未使用画像
+  dev/competition/                             # 改善中に参照する画像
+data/annotations/video_frames/blue20/h01_s01/
+  LR/{labels,previews,annotation_report.csv}
+  FB/{labels,previews,annotation_report.csv}
+```
+
+古い `L30/L45/R30/R45/F30/F45/B30/B45` は新規撮影には使用しない。既存の緑の角度固定実写はバックアップと評価方針を確認して別に保管すること。
+
+## 事前準備（Windows）
+
+1. 東芝テリー公式サイトから **TeliCamSDK** を導入、TeliViewerで BU160MCF が映ることを確認
+2. 公式の **pytelicam** Windows / Python 3.11 用 wheel を入手。カメラの接続・ストリーミング確認は使用者のPCで実施
+3. `uv sync` で既存の仮想環境を同期。公式wheelがローカルにある場合、例：
+
+```powershell
+uv pip install "C:\path\to\pytelicam-<version>-cp311-cp311-win_amd64.whl"
+```
+
+実際のwheelファイル名に置き換えること。pytelicamはメーカーSDKのため、通常の依存リストに勝手に追加していない。**TeliViewerとPythonアプリが同時にカメラを開くと競合する場合があるので、撮影前にTeliViewerを閉じる。**
+
+公式資料： https://www.toshiba-teli.co.jp/products/industrial-camera/software-telicamsdk.htm
+
+## 1. 動画を撮影する
+
+```powershell
+uv run python scripts/capture_karuta_video.py --color blue20 --direction LR
+uv run python scripts/capture_karuta_video.py --color blue20 --direction FB
+```
+
+画面にはCSVの順番にA01/003などを表示する。20枚をA01→A20順に撮る。
+
+操作：
+- `R`：録画開始/停止（札を固定してカメラを左→右、または手前→奥へゆっくり動かす）
+- `N`：次の札（録画停止後のみ）
+- `P`：前の札
+- `Q` / `Esc`：終了
+
+1枚につきLR1本、FB1本。動画が存在する場合は上書きせず撮影を開始しない。
+途中の札から始める例：
+
+```powershell
+uv run python scripts/capture_karuta_video.py --color blue20 --direction LR --start 6
+```
+
+動画はMJPG形式のAVIで保存し、フレーム数・日時・撮影秒数を `capture_index.csv` に記録する。
+`--fps 15` は**動画ファイルの再生FPS**であり、実際の取得FPSの保証ではない。実取得の目安はCSVの `observed_fps` を確認。カメラの露光・ゲインはSDK側で設定したものを使用する。
+
+撮影動画が録画途中で中断された場合は、不完全ファイルの可能性があるため再生してから採用する。
+
+## 2. 動画から数フレームを抽出する
+
+```powershell
+uv run python scripts/extract_karuta_frames.py --color blue20 --direction LR --per-video 5
+uv run python scripts/extract_karuta_frames.py --color blue20 --direction FB --per-video 5
+```
+
+録画を時間軸上でおおむね5区分し、各区間の鮮明なフレームを優先する（Laplacian分散）。
+輪郭候補が写っている画像を優先するが**札が正しく撮れている保証はない**。抽出後は手・文字のブレ・札の欠け・過剰な類似を目視確認する。
+
+抽出画像は `card_003_LR_h01_s01_f000090.png` のように保存される。
+CSV `extraction_report.csv` に札番号、元動画、抽出フレーム番号、鮮明さ等を保存。元動画は変更しない。既存の抽出ファイルは上書きしない。
+
+## 3. 仮アノテーション
+
+```powershell
+uv run python scripts/annotate_karuta_frames.py --color blue20 --direction LR
+uv run python scripts/annotate_karuta_frames.py --color blue20 --direction FB
+```
+
+既存の `scripts/auto_annotate.py` の輪郭検出処理を再利用する。
+`data/annotations/video_frames/<color>/h01_s01/<direction>/` に
+- `labels/`：YOLO Detectラベル（暫定）
+- `previews/`：枠確認用の画像
+- `annotation_report.csv`：状態 `REVIEW` / `FAIL` / `SKIPPED_EXISTING_LABEL`
+
+を保存する。既存ラベルを**自動で上書きしない**。
+
+統合100クラスの暫定クラスIDは `card_id-1`（001→0、100→99）。
+現在の緑20専用クラスIDとは異なるため、既存 `green20_v3` などに混ぜないこと。
+
+`REVIEW` は**自動生成したままで未承認**。全フレームについて枠、札番号を目視確認し、誤検出は手動修正してから学習に使用する。
+
+## 撮影・評価の注意点
+
+- trainの動画から抽出した別フレームをval/testへ混ぜない
+- 緑の既存角度固定の実写をval/testとして使うときは、同じ元画像・同じセッション由来の動画をtrainに入れない
+- 動画のフレームごとの見え方は角度センサーなしでは正確な度数を決められない
+- 真上h01画像を縮小してh02/h03を模擬する工程は**今回の撮影プログラムにはまだ実装していない**
+- BU160MCF実機がこの実行環境にないため、pytelicam接続・実際の録画FPS・露光の適正値はPCで確認する必要がある
