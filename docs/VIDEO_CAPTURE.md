@@ -212,3 +212,19 @@ v2の出力先：
 **再実行時は既存ラベルを上書きしない。** `SKIPPED_EXISTING_LABEL` は検出結果が最新になったという意味ではない。v2をやり直すときは該当札のv2ファイルを退避・見直すこと。緑の既存20クラスモデルとv1ラベルには影響しない。
 
 これは**まだ実機画像に対して検証済みではない**仮アノテーション支援ツール。YOLOで先に札の位置を検出する方式ではなく、画像の中心付近に札がある条件に基づく。緑の境界が白飛び・影・モーションブラーで失われた場合は失敗し得る。出力は全て目視確認が必要。
+
+## 緑縁が途切れる動画への追加対応（v3）
+
+v2で緑縁を検出できなかったフレーム向けに、`scripts/annotate_karuta_frames_v3.py` を追加した。v3はv2の検出を優先し、失敗時のみ色相・彩度の閾値を緩和し、途切れた緑縁を小さなモルフォロジー閉処理で繋げて候補を生成する。候補内の**黒い文字＋明るい札面**と中央付近の配置を確認するので、単なる白い蛍光灯反射は札として選びにくい。4点推定できたときは凸四角形、できなければ回転矩形近似となる。
+
+```powershell
+uv run --no-sync python scripts/annotate_karuta_frames_v3.py --color green20 --direction LR
+uv run --no-sync python scripts/annotate_karuta_frames_v3.py --color green20 --direction FB
+uv run --no-sync python scripts/review_karuta_annotations.py --color green20 --variant v3
+start data/annotations/video_frames/green20/review_gallery_v3.html
+```
+
+- 出力先：`data/annotations/video_frames/green20/h01_s01/LR_v3/` と `FB_v3/`
+- 比較：v1/v2のラベルとプレビューを保存したまま、v3の結果を別のHTMLで確認できる
+- 注意：自動判定で検出できない場合はFAILを残す。無理にラベルを付けない。全件目視で確認すること
+- v3は一部の途切れた緑縁に対応する**暫定実装**であり、撮影済み全フレームでの検証はまだ実施していない
