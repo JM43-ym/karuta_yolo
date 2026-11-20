@@ -137,7 +137,7 @@ def main() -> None:
     started_iso = ""
     count = 0
     try:
-        cv2.namedWindow("Karuta Capture", cv2.WINDOW_NORMAL)
+        cv2.namedWindow("Karuta Capture", cv2.WINDOW_AUTOSIZE)
         while True:
             frame = camera.read()
             row = cards[index]
