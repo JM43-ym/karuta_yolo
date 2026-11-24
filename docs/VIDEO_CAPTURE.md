@@ -6,20 +6,20 @@
 - 各色の `data/metadata/<color>_cards.csv` は競技かるた番号 `card_id` 昇順。色内番号 `group_id` も01〜20の連番（青A、赤B、黄C、緑D、橙E）。
 - 1札につきLR（左右）・FB（前後）を1本ずつ撮影。緑20枚の従来の札番号対応は変更していない。
 - 抽出はカメラの移動速度を考慮して**画像の変化量・鮮明さ**から既定で5枚選択する（角度を厳密に推定するものではない）。
-- **動画用アノテーションは`scripts/annotate_karuta_frames.py` の1種類に統一**。緑の縁を優先し、反射や台形を考慮した四隅推定を行う。失敗画像だけ手動修正する。
+- **動画用アノテーションは`scripts/annotation/annotate_karuta_frames.py` の1種類に統一**。緑の縁を優先し、反射や台形を考慮した四隅推定を行う。失敗画像だけ手動修正する。
 - 従来の緑20クラス用モデル、既存の学習データセット`green20_v2/v3/v4`は別物として保持。100クラスYOLOのクラスIDは`card_id - 1`（001→0、100→99）。
 
 ## 使用するスクリプト
 
 | ファイル | 用途 |
 |---|---|
-| `scripts/capture_karuta_video.py` | カメラ映像をLR/FB録画（GUI操作可、ガイド比率初期値0.52） |
-| `scripts/extract_karuta_frames.py` | 動画からフレーム抽出 |
-| `scripts/annotate_karuta_frames.py` | 緑の外枠・台形を検出し、YOLOラベルと確認画像を出力 |
-| `scripts/manual_fix_karuta_frames.py` | ラベル未作成の画像の四隅をクリックして補修 |
-| `scripts/review_karuta_annotations.py` | 札番号順にLR/FBを一覧表示するHTML作成 |
+| `scripts/gui/capture_karuta_video.py` | カメラ映像をLR/FB録画（GUI操作可、ガイド比率初期値0.52） |
+| `scripts/capture/extract_karuta_frames.py` | 動画からフレーム抽出 |
+| `scripts/annotation/annotate_karuta_frames.py` | 緑の外枠・台形を検出し、YOLOラベルと確認画像を出力 |
+| `scripts/annotation/manual_fix_karuta_frames.py` | ラベル未作成の画像の四隅をクリックして補修 |
+| `scripts/annotation/review_karuta_annotations.py` | 札番号順にLR/FBを一覧表示するHTML作成 |
 
-※ `scripts/auto_annotate.py` は以前の**真上画像・緑20クラス**用に残す。動画用スクリプトとは別の目的なので削除しない。
+※ `scripts/annotation/auto_annotate.py` は以前の**真上画像・緑20クラス**用に残す。動画用スクリプトとは別の目的なので削除しない。
 
 ## Windowsでの実行方法
 
@@ -30,8 +30,8 @@
 ### ① 動画撮影（撮影済みなら不要）
 
 ```powershell
-uv run --no-sync python scripts/capture_karuta_video.py --color green20 --direction LR
-uv run --no-sync python scripts/capture_karuta_video.py --color green20 --direction FB
+uv run --no-sync python scripts/gui/capture_karuta_video.py --color green20 --direction LR
+uv run --no-sync python scripts/gui/capture_karuta_video.py --color green20 --direction FB
 ```
 
 録画ウィンドウのボタン：PREVIOUS / START REC（録画中STOP/SAVE）/ NEXT / QUIT。
@@ -40,8 +40,8 @@ uv run --no-sync python scripts/capture_karuta_video.py --color green20 --direct
 ### ② 動画からフレーム抽出
 
 ```powershell
-uv run --no-sync python scripts/extract_karuta_frames.py --color green20 --direction LR --per-video 5
-uv run --no-sync python scripts/extract_karuta_frames.py --color green20 --direction FB --per-video 5
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR --per-video 5
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction FB --per-video 5
 ```
 
 出力先：
@@ -51,8 +51,8 @@ uv run --no-sync python scripts/extract_karuta_frames.py --color green20 --direc
 ### ③ 自動アノテーション
 
 ```powershell
-uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction LR
-uv run --no-sync python scripts/annotate_karuta_frames.py --color green20 --direction FB
+uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction LR
+uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction FB
 ```
 
 出力：
@@ -75,8 +75,8 @@ data/annotations/video_frames/<color>/h01_s01/
 ### ④ 失敗した画像だけ手動補修
 
 ```powershell
-uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction LR
-uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --direction FB
+uv run --no-sync python scripts/annotation/manual_fix_karuta_frames.py --color green20 --direction LR
+uv run --no-sync python scripts/annotation/manual_fix_karuta_frames.py --color green20 --direction FB
 ```
 
 四隅をクリックした後、`S`で保存、`R`でやり直し、`N`でスキップ、`Q`またはEscで終了。すでにラベルがある画像は対象外です。自動検出結果がずれている場合は、学習前に個別に確認・修正が必要です。
@@ -84,7 +84,7 @@ uv run --no-sync python scripts/manual_fix_karuta_frames.py --color green20 --di
 ### ⑤ 確認用HTMLを作成
 
 ```powershell
-uv run --no-sync python scripts/review_karuta_annotations.py --color green20
+uv run --no-sync python scripts/annotation/review_karuta_annotations.py --color green20
 start data/annotations/video_frames/green20/review_gallery.html
 ```
 
@@ -101,13 +101,13 @@ start data/annotations/video_frames/green20/review_gallery.html
 
 学習セット目標：Train 8,520枚（LR 100、FB 100、s01正面20を3倍率で拡張。LR/FBは−15～+15°を5°刻み、正面は0～355°を5°刻み）。Val 180枚（以前のL/R/F/B 30°・45°を各20枚、別撮影s02正面20枚）。**Valに回転・拡縮は適用しない。** 現時点では予定枚数であり、元画像・アノテーション・倍率実測値の確認前に自動生成したものではない。
 
-各固定角度の画像がまだリネームされていない場合は `scripts/rename_green20_val_angles.py` を使用。フォルダは**ローカルの実際の保存先**を `--folder` に指定する。
+各固定角度の画像がまだリネームされていない場合は `scripts/renaming/rename_green20_val_angles.py` を使用。フォルダは**ローカルの実際の保存先**を `--folder` に指定する。
 
 ```powershell
 # F30の例。実際のフォルダパスに置き換える
-uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30"
+uv run --no-sync python scripts/renaming/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30"
 # 20枚の並びが緑D01～D20で正しいことを画像で確認した後のみ
-uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30" --apply --confirm-order
+uv run --no-sync python scripts/renaming/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/val/single/oblique/F30" --apply --confirm-order
 ```
 
 角度は `L30 L45 R30 R45 F30 F45 B30 B45` の8種類。同一スクリプトで任意の1角度を扱う。**ファイル名の自然順がD01～D20と一致するという仮定**で名称案を出すだけで、画像内容から札番号を識別するわけではない。順序が違う場合は `--apply` しない。既存ファイルへの上書きは禁止している。リネームが終わったら各角度に対応するYOLOラベルを目視確認のうえで用意する。
@@ -122,18 +122,18 @@ uv run --no-sync python scripts/rename_green20_val_angles.py --angle F30 --folde
 
 `data/raw/green20/train/single/oblique/h01_s01/<角度>/`
 
-固定角度画像の自動アノテーションには、**動画用とは別の** `scripts/annotate_green20_val_angles.py` を使用します。バージョン切り替えはありません。8方向まとめて実行できます。
+固定角度画像の自動アノテーションには、**動画用とは別の** `scripts/annotation/annotate_green20_val_angles.py` を使用します。バージョン切り替えはありません。8方向まとめて実行できます。
 
 ```powershell
 # 8方向すべての自動ラベル作成
-uv run --no-sync python scripts/annotate_green20_val_angles.py
+uv run --no-sync python scripts/annotation/annotate_green20_val_angles.py
 # HTMLで結果を確認
-uv run --no-sync python scripts/annotate_green20_val_angles.py --review
+uv run --no-sync python scripts/annotation/annotate_green20_val_angles.py --review
 start data/annotations/green20_fixed_angle_val/review_gallery.html
 # 未検出のF30だけをクリックで補修する例
-uv run --no-sync python scripts/annotate_green20_val_angles.py --angle F30 --fix-missing
+uv run --no-sync python scripts/annotation/annotate_green20_val_angles.py --angle F30 --fix-missing
 # 修正後に再生成
-uv run --no-sync python scripts/annotate_green20_val_angles.py --review
+uv run --no-sync python scripts/annotation/annotate_green20_val_angles.py --review
 ```
 
 出力先は `data/annotations/green20_fixed_angle_val/<角度>/{labels,previews,annotation_report.csv}`。**元画像と既存ラベルを上書きしない。** ラベルは緑20クラス0～19（動画用100クラスラベルとは異なる）。`REVIEW`と`MANUAL_REVIEW`は未承認であり、必ず外枠・札番号を全件目視確認する。
@@ -144,10 +144,10 @@ uv run --no-sync python scripts/annotate_green20_val_angles.py --review
 
 ## 次の段階：s02正面20枚の確認とTrain 8,520 / Val 180データセット生成
 
-固定角度Val160枚が正しくラベル付けできた後は、`scripts/build_green20_video_augmented.py` を使用します。**最初の実行はチェックのみ**で、画像の書き出しは行いません。
+固定角度Val160枚が正しくラベル付けできた後は、`scripts/dataset/build_green20_video_augmented.py` を使用します。**最初の実行はチェックのみ**で、画像の書き出しは行いません。
 
 ```powershell
-uv run --no-sync python scripts/build_green20_video_augmented.py
+uv run --no-sync python scripts/dataset/build_green20_video_augmented.py
 ```
 
 チェック内容：
@@ -161,7 +161,7 @@ uv run --no-sync python scripts/build_green20_video_augmented.py
 全条件がそろい、**固定角度160枚が動画Trainとは別撮影であることを確認できた場合のみ**、次のビルドを実行します。
 
 ```powershell
-uv run --no-sync python scripts/build_green20_video_augmented.py --build --confirm-independent-val
+uv run --no-sync python scripts/dataset/build_green20_video_augmented.py --build --confirm-independent-val
 ```
 
 生成先は新しい `data/datasets/green20_video_augmented/`。既存データセットを**上書きしない**。TrainはLR/FB画像それぞれ100×3倍率×7角度、s01正面画像20×3倍率×72角度。Valは160枚の固定角度撮影画像+s02正面20枚の**原本のまま**。拡張中の札が画像外に出る場合は無理にクリップせずエラーを出す。scaleは画像全体をリサイズするのではなく、固定キャンバス上で札の見かけの大きさを変える。学習時には`fliplr=0 flipud=0`の指定も必要。
@@ -171,4 +171,4 @@ uv run --no-sync python scripts/build_green20_video_augmented.py --build --confi
 
 ## 用途別フォルダへの実装移動（2026-11-24）
 
-撮影GUI: `scripts/gui/capture_karuta_video.py` / 動画フレーム抽出: `scripts/capture/extract_karuta_frames.py` / 動画アノテーション: `scripts/annotation/annotate_karuta_frames.py` / 手動修正: `scripts/annotation/manual_fix_karuta_frames.py`。旧パスは互換ラッパーとして残されています。詳しくは [スクリプトのフォルダ整理](SCRIPT_ORGANIZATION.md) を参照してください。
+撮影GUI: `scripts/gui/capture_karuta_video.py` / 動画フレーム抽出: `scripts/capture/extract_karuta_frames.py` / 動画アノテーション: `scripts/annotation/annotate_karuta_frames.py` / 手動修正: `scripts/annotation/manual_fix_karuta_frames.py`。旧パスの互換ラッパーは削除済みです。詳しくは [スクリプトのフォルダ整理](SCRIPT_ORGANIZATION.md) を参照してください。

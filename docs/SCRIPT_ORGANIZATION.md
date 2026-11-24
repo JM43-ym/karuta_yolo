@@ -1,107 +1,76 @@
-# Pythonスクリプトの用途別フォルダ整理（2026-11-24）
+# スクリプトの用途別整理（2026-11-24）
 
-## 概要
+## 完了した整理
 
-**Pythonの実装本体を用途別フォルダへ移動済みです。** 旧 `scripts/*.py` は小さな互換ラッパーに置き換えてあります。以前のコマンドも当面そのまま使用できます。データ・学習済みモデル・実験ログは移動していません。
+Pythonの実装本体21ファイルは用途別ディレクトリに移動済みです。**旧 `scripts/<ファイル名>.py` の互換ラッパーは削除済み**です。今後は新しいパスを使用してください。
 
 ```text
 scripts/
-├── annotation/
-│   ├── auto_annotate.py               # 正面単札の自動アノテーション
-│   ├── annotate_karuta_frames.py      # 動画抽出画像
-│   ├── annotate_green20_val_angles.py # 固定角度Val
-│   ├── annotate_multi_val.py          # 複数札Val
-│   ├── manual_fix_karuta_frames.py    # 4点手動補正
-│   └── review_karuta_annotations.py   # レビュー画面
-├── renaming/
-│   ├── rename_green20.py
-│   └── rename_green20_val_angles.py
-├── capture/
-│   └── extract_karuta_frames.py       # 動画から5フレーム抽出
-├── gui/
-│   └── capture_karuta_video.py        # pytelicam撮影GUI
-├── dataset/
-│   ├── build_green20_video_augmented.py
-│   ├── build_green20_v3.py
-│   ├── build_green20_v4.py
-│   ├── generate_rotations.py
-│   ├── dataset_inventory.py
-│   └── check_green20_paths.py
-├── training/
-│   └── train_green20.py
-├── inference/
-│   ├── predict_green20.py
-│   ├── card_geometry.py
-│   ├── prediction_filter.py
-│   └── prediction_history.py
-├── toolbox.py                        # 用途別メニューの共通呼び出し
-├── verify_script_layout.py          # フォルダ移動の簡易検証
-└── （旧ファイル名.py）                # 互換性用の軽量ラッパー
+├── annotation/    # 正面・動画・固定角度・複数札のアノテーション、四隅修正、レビュー
+├── renaming/      # ファイル名と札番号を対応付ける
+├── capture/       # 動画から5フレーム抽出
+├── gui/           # pytelicam対応の撮影GUI
+├── dataset/       # Train/Valの生成・画像/ラベル検査
+├── training/      # YOLO学習
+├── inference/     # 推論・フィルタ・履歴・札形状
+├── presentation/  # PowerPoint作成
+├── toolbox.py             # 用途別入口の共通処理（残す）
+└── verify_script_layout.py # 静的検査（残す）
 ```
 
-## 移動に伴う修正
+学習済みモデル `runs/`、撮影元画像 `data/raw/`、アノテーション `data/annotations/`、生成済データセット `data/datasets/`、研究日誌は移動・削除していません。
 
-- 本体にある `Path(__file__).resolve().parents[1]` によるプロジェクト基準パスを、1階層深い移動先に合わせて `parents[2]` へ修正しました。
-- 異なる用途のモジュールを読み込めるよう、各本体は従来 `scripts/` 内の互換モジュールを参照できるようにしています。
-- `toolbox.py` と用途別 `main.py` は**移動後の実ファイル**を起動します。
-- `data/raw/`, `data/datasets/`, `data/annotations/`, `runs/`, `research_diary.csv` は移動・削除していません。
-- 既存の各スクリプト内にある旧実行例のパスも、互換ラッパーによって引き続き有効です。
+## import・パスの修正
 
-## Windows / PowerShell での操作
+- 各モジュール内の依存関係を `from annotation.auto_annotate import ...`、`from dataset.generate_rotations import ...`、`from inference.card_geometry import ...` のように用途別パッケージの参照に変更。
+- 実装本体からプロジェクトルートを探すパスは `Path(__file__).resolve().parents[2]` を使用。
+- 各フォルダに `__init__.py` を追加。
+- `scripts/toolbox.py` および用途別 `main.py` は直接新パスを起動。
+- 21個の旧互換ラッパーを削除し、互換ファイルに依存しないよう修正。
 
-まずVSCodeの `karuta_yolo` でGitHubからPullしてください。既存の `.venv` と pytelicamを維持するため、従来どおり `uv run --no-sync` を使用します。
+## Pull直後の安全確認
 
-### 1. 移動後の簡易検査（ファイルを変更しません）
+研究室PCのVSCodeで、ローカル未コミットの変更がないことを確かめ、GitHubからPullしてください。
 
 ```powershell
 uv run --no-sync python scripts/verify_script_layout.py
-uv run --no-sync python scripts/dataset/main.py inspect --data data/datasets/green20_video_augmented/data.yaml
+uv run --no-sync python scripts/dataset/dataset_inventory.py --data data/datasets/green20_video_augmented/data.yaml
+uv run --no-sync python scripts/inference/predict_green20.py --help
+uv run --no-sync python scripts/training/train_green20.py --help
+uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --help
+uv run --no-sync python scripts/gui/capture_karuta_video.py --help
 ```
 
-検査で失敗した場合は、学習・推論前にエラー出力を確認してください。
+検査・helpでは学習・撮影・データ書き換えを行いません。カメラドライバの接続を伴うGUI本体の撮影テストは別途実施してください。
 
-### 2. 推論（新しいパス）
-
-```powershell
-uv run --no-sync python scripts/inference/predict_green20.py --model runs/green20/trial_video_aug_01/weights/best.pt --source data/raw/green20/dev/competition --imgsz 1280 --conf 0.25 --device 0 --output runs/green20_labeled/trial_video_aug_01
-```
-
-同じ内容を `scripts/inference/main.py predict` からも実行できます。画像フォルダが異なるときは `--source` を変更してください。
-
-### 3. 撮影GUI
+## 主要コマンド
 
 ```powershell
-uv run --no-sync python scripts/gui/capture_karuta_video.py --color blue20 --direction LR
-```
+# 札の撮影GUI
+uv run --no-sync python scripts/gui/capture_karuta_video.py --color green20 --direction LR
 
-または `uv run --no-sync python scripts/gui/main.py camera --color blue20 --direction LR`。
+# 動画から抽出
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR --per-video 5
 
-### 4. 画像のリネーム
-
-```powershell
-uv run --no-sync python scripts/renaming/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/train/single/oblique/h01_s01/F30"
-```
-
-`--apply --confirm-order` を付ける前に、対応順序を目視確認してください。
-
-### 5. 動画抽出とアノテーション
-
-```powershell
-uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR
+# アノテーション・確認
 uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction LR
-uv run --no-sync python scripts/annotation/manual_fix_karuta_frames.py --color green20 --direction LR
 uv run --no-sync python scripts/annotation/review_karuta_annotations.py --color green20
-```
 
-### 6. データセット生成・学習
+# 画像リネーム：まずは確認のみ
+uv run --no-sync python scripts/renaming/rename_green20_val_angles.py --angle F30 --folder "data/raw/green20/train/single/oblique/h01_s01/F30"
 
-```powershell
-uv run --no-sync python scripts/dataset/build_green20_video_augmented.py
+# 既存データセット検査
+uv run --no-sync python scripts/dataset/dataset_inventory.py --data data/datasets/green20_video_augmented/data.yaml
+
+# 学習（新規実験として実行するときのみ）
 uv run --no-sync python scripts/training/train_green20.py --data data/datasets/green20_video_augmented/data.yaml --epochs 30 --batch 8 --imgsz 640 --name trial_video_aug_02
+
+# 保存済みbest.ptで画像推論
+uv run --no-sync python scripts/inference/predict_green20.py --model runs/green20/trial_video_aug_01/weights/best.pt --source data/raw/green20/dev/competition --imgsz 1280 --conf 0.25 --device 0
 ```
 
-データセット生成のコマンドは**確認のみ**です。既存の8,520枚を上書きしません。追加学習を行わない場合、学習コマンドは実行しないでください。
+※ 使用しているメーカー専用の`pytelicam`等を保持するため、これまで通り `uv run --no-sync` を使用します。
 
-## 注意
+## 旧コードの復元
 
-旧ファイルが互換ラッパーなので、旧ファイルを削除すると既存のimportや過去の実行手順が壊れる可能性があります。将来の完全なパッケージ化でimportを整理するまでは保持してください。今回GitHub上で静的な移動・パス修正を行いましたが、実際のWindows機・カメラ・GPU環境での動作確認はこれからです。
+変更はGitHubの履歴に残っています。過去の記録・手順に旧パスの記載がある場合は、上記の新パスへ置き換えてください。ローカルで旧互換ラッパーを独自に編集していた場合は、Pull前に差分を確認してください。

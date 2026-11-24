@@ -1,7 +1,7 @@
 """Run an existing karuta_yolo script via a categorized command entry point.
 
-The original scripts stay in scripts/ for compatibility with imports and
-existing lab procedures. This is a transitional, non-destructive organizer.
+Implementations live in categorized folders. This launcher delegates to those
+paths; legacy top-level shim files have been removed.
 """
 from __future__ import annotations
 
