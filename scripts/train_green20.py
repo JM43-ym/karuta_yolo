@@ -1,5 +1,11 @@
-"""Compatibility entry point; implementation moved to training/train_green20.py."""
-from training.train_green20 import *
+"""Backward-compatible facade for scripts/training/train_green20.py.
+
+Imports re-export the implementation. CLI execution delegates directly to the
+moved script without importing it twice.
+"""
 if __name__ == "__main__":
+    from pathlib import Path
     import runpy
-    runpy.run_module("training.train_green20", run_name="__main__", alter_sys=True)
+    runpy.run_path(str(Path(__file__).resolve().parent / "training/train_green20.py"), run_name="__main__")
+else:
+    from training.train_green20 import *

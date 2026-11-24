@@ -1,5 +1,11 @@
-"""Compatibility entry point; implementation moved to inference/prediction_history.py."""
-from inference.prediction_history import *
+"""Backward-compatible facade for scripts/inference/prediction_history.py.
+
+Imports re-export the implementation. CLI execution delegates directly to the
+moved script without importing it twice.
+"""
 if __name__ == "__main__":
+    from pathlib import Path
     import runpy
-    runpy.run_module("inference.prediction_history", run_name="__main__", alter_sys=True)
+    runpy.run_path(str(Path(__file__).resolve().parent / "inference/prediction_history.py"), run_name="__main__")
+else:
+    from inference.prediction_history import *

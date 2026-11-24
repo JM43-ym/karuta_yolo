@@ -1,5 +1,11 @@
-"""Compatibility entry point; implementation moved to annotation/manual_fix_karuta_frames.py."""
-from annotation.manual_fix_karuta_frames import *
+"""Backward-compatible facade for scripts/annotation/manual_fix_karuta_frames.py.
+
+Imports re-export the implementation. CLI execution delegates directly to the
+moved script without importing it twice.
+"""
 if __name__ == "__main__":
+    from pathlib import Path
     import runpy
-    runpy.run_module("annotation.manual_fix_karuta_frames", run_name="__main__", alter_sys=True)
+    runpy.run_path(str(Path(__file__).resolve().parent / "annotation/manual_fix_karuta_frames.py"), run_name="__main__")
+else:
+    from annotation.manual_fix_karuta_frames import *
