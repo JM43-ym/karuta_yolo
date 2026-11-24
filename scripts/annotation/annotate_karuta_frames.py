@@ -19,7 +19,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from auto_annotate import read_image, save_image, make_annotation
+from annotation.auto_annotate import read_image, save_image, make_annotation
 
 ROOT = Path(__file__).resolve().parents[2]
 COLORS = ("green20", "blue20", "pink20", "yellow20", "orange20")

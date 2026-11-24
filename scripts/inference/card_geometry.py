@@ -17,7 +17,7 @@ if str(_SCRIPTS_DIR) not in _sys.path:
 from dataclasses import dataclass
 import cv2
 import numpy as np
-from auto_annotate import candidate_rects
+from annotation.auto_annotate import candidate_rects
 
 CARD_SHORT_MM=52.0
 CARD_LONG_MM=73.0

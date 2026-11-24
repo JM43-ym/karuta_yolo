@@ -19,7 +19,7 @@ import csv
 import shutil
 from pathlib import Path
 
-from generate_rotations import ROOT, load_image, read_report, get_corners, xywh_from_corners, save_png, write_label
+from dataset.generate_rotations import ROOT, load_image, read_report, get_corners, xywh_from_corners, save_png, write_label
 
 RAW = ROOT / "data/raw/green20"
 ANN = ROOT / "data/annotations"

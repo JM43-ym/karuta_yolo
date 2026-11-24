@@ -23,7 +23,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from auto_annotate import candidate_rects, make_annotation, read_image, save_image
+from annotation.auto_annotate import candidate_rects, make_annotation, read_image, save_image
 
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = ROOT / "data/metadata/green20_val_layouts.csv"

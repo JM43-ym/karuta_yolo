@@ -19,7 +19,7 @@ import csv
 import shutil
 from pathlib import Path
 
-from generate_rotations import (ROOT, RAW, ANNOTATIONS, session_sources,
+from dataset.generate_rotations import (ROOT, RAW, ANNOTATIONS, session_sources,
                                 load_image, get_corners, xywh_from_corners,
                                 rotation, save_png, write_label)
 

@@ -19,8 +19,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from generate_rotations import ROOT, load_image, save_png, get_corners, rotation, xywh_from_corners, write_label
-from annotate_green20_val_angles import ANGLES, SOURCE as FIXED_SOURCE, OUTPUT as FIXED_ANN
+from dataset.generate_rotations import ROOT, load_image, save_png, get_corners, rotation, xywh_from_corners, write_label
+from annotation.annotate_green20_val_angles import ANGLES, SOURCE as FIXED_SOURCE, OUTPUT as FIXED_ANN
 
 RAW=ROOT/"data/raw/green20"
 ANN=ROOT/"data/annotations"

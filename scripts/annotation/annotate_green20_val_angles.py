@@ -28,8 +28,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from auto_annotate import read_image, save_image, make_annotation
-from annotate_karuta_frames import (detect_green_quad, detect_fragmented_green,
+from annotation.auto_annotate import read_image, save_image, make_annotation
+from annotation.annotate_karuta_frames import (detect_green_quad, detect_fragmented_green,
                                      order_points)
 
 ROOT = Path(__file__).resolve().parents[2]
