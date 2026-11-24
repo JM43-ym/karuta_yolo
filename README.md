@@ -56,3 +56,7 @@ uv run --no-sync python scripts/review_karuta_annotations.py --color green20
 ```
 
 5色とも`--color`を置き換えて使用できます。詳細は [動画撮影・アノテーション手順](docs/VIDEO_CAPTURE.md) を参照してください。撮影動画や学習済みの既存緑20クラス用モデルはそのまま保持します。
+
+## スクリプトの用途別入口（互換性維持）
+
+用途別の実行入口を `scripts/annotation/`, `scripts/renaming/`, `scripts/capture/`, `scripts/dataset/`, `scripts/training/`, `scripts/inference/` に用意しました。既存スクリプトは依存関係を壊さないよう元の場所に保持しています。使い方は [スクリプトのフォルダ整理](docs/SCRIPT_ORGANIZATION.md) を参照してください。
