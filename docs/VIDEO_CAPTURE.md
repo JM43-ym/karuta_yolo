@@ -167,3 +167,8 @@ uv run --no-sync python scripts/build_green20_video_augmented.py --build --confi
 生成先は新しい `data/datasets/green20_video_augmented/`。既存データセットを**上書きしない**。TrainはLR/FB画像それぞれ100×3倍率×7角度、s01正面画像20×3倍率×72角度。Valは160枚の固定角度撮影画像+s02正面20枚の**原本のまま**。拡張中の札が画像外に出る場合は無理にクリップせずエラーを出す。scaleは画像全体をリサイズするのではなく、固定キャンバス上で札の見かけの大きさを変える。学習時には`fliplr=0 flipud=0`の指定も必要。
 
 **注意**：高解像度画像をPNGで8,520枚作るためディスク容量が大きくなる。ビルドは必ずチェックが成功し、空き容量を確保した後に行う。動画元画像・既存のラベルは変更しない。`s02`と名付けただけの固定角度写真は独立撮影を意味しない。比較したい既存モデルが過去にこの160枚をTrainに使っていたなら、そのモデルの独立Valとしては使用できない。
+
+
+## 用途別フォルダへの実装移動（2026-11-24）
+
+撮影GUI: `scripts/gui/capture_karuta_video.py` / 動画フレーム抽出: `scripts/capture/extract_karuta_frames.py` / 動画アノテーション: `scripts/annotation/annotate_karuta_frames.py` / 手動修正: `scripts/annotation/manual_fix_karuta_frames.py`。旧パスは互換ラッパーとして残されています。詳しくは [スクリプトのフォルダ整理](SCRIPT_ORGANIZATION.md) を参照してください。

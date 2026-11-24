@@ -1,8 +1,10 @@
-# GUI関連スクリプトの配置場所
+# 撮影GUI
 
-撮影GUI・カメラ操作GUIは、現在の実ファイル名と依存関係を確認してから段階的にここへ移行します。
+実装本体: `scripts/gui/capture_karuta_video.py`（旧 `scripts/capture_karuta_video.py` は互換ラッパー）
 
-**現時点では既存GUIの実体ファイルは移動・削除していません。**
-古い起動方法が使えなくなることを防ぐためです。
+```powershell
+uv run --no-sync python scripts/gui/capture_karuta_video.py --color green20 --direction LR
+uv run --no-sync python scripts/gui/main.py camera --color blue20 --direction FB
+```
 
-GUIの実ファイルを追加するときは、画像取得用のドライバ（pytelicamなど）と相対パス、外部起動箇所を確認してから移行してください。
+BU160MCF系カメラと `pytelicam` が必要です。メーカー専用パッケージは再同期で失われる可能性があるため、既存環境では `--no-sync` を使用します。撮影前に接続状態と保存先、同名ファイルの扱いを確認してください。

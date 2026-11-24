@@ -59,4 +59,4 @@ uv run --no-sync python scripts/review_karuta_annotations.py --color green20
 
 ## スクリプトの用途別入口（互換性維持）
 
-用途別の実行入口を `scripts/annotation/`, `scripts/renaming/`, `scripts/capture/`, `scripts/dataset/`, `scripts/training/`, `scripts/inference/` に用意しました。既存スクリプトは依存関係を壊さないよう元の場所に保持しています。使い方は [スクリプトのフォルダ整理](docs/SCRIPT_ORGANIZATION.md) を参照してください。
+実装本体を `scripts/annotation/`, `scripts/renaming/`, `scripts/capture/`, `scripts/gui/`, `scripts/dataset/`, `scripts/training/`, `scripts/inference/` に移動しました。旧パスには互換ラッパーを残しています。使い方は [スクリプトのフォルダ整理](docs/SCRIPT_ORGANIZATION.md) を参照してください。
