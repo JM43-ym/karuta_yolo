@@ -13,28 +13,31 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 TOOLS = {
     "annotation": {
-        "top": "auto_annotate.py",
-        "video": "annotate_karuta_frames.py",
-        "fixed": "annotate_green20_val_angles.py",
-        "manual": "manual_fix_karuta_frames.py",
-        "review": "review_karuta_annotations.py",
+        "top": "annotation/auto_annotate.py",
+        "video": "annotation/annotate_karuta_frames.py",
+        "fixed": "annotation/annotate_green20_val_angles.py",
+        "manual": "annotation/manual_fix_karuta_frames.py",
+        "review": "annotation/review_karuta_annotations.py",
     },
     "renaming": {
-        "top": "rename_green20.py",
-        "fixed": "rename_green20_val_angles.py",
+        "top": "renaming/rename_green20.py",
+        "fixed": "renaming/rename_green20_val_angles.py",
     },
     "capture": {
-        "frames": "extract_karuta_frames.py",
+        "frames": "capture/extract_karuta_frames.py",
+    },
+    "gui": {
+        "camera": "gui/capture_karuta_video.py",
     },
     "dataset": {
-        "build": "build_green20_video_augmented.py",
-        "inspect": "dataset_inventory.py",
+        "build": "dataset/build_green20_video_augmented.py",
+        "inspect": "dataset/dataset_inventory.py",
     },
     "training": {
-        "train": "train_green20.py",
+        "train": "training/train_green20.py",
     },
     "inference": {
-        "predict": "predict_green20.py",
+        "predict": "inference/predict_green20.py",
     },
 }
 def main(category: str | None = None) -> None:
@@ -49,7 +52,7 @@ def main(category: str | None = None) -> None:
         args, rest = parser.parse_known_args()
         action = args.action
     if not category or action not in TOOLS[category]:
-        available = ", ".join(TOOLS.get(category, {})) if category else "annotation, renaming, capture, dataset, training, inference"
+        available = ", ".join(TOOLS.get(category, {})) if category else "annotation, renaming, capture, gui, dataset, training, inference"
         parser.error(f"Choose a valid category/action. Available: {available}")
     src = ROOT / TOOLS[category][action]
     if not src.is_file():
