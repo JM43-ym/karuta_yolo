@@ -20,8 +20,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from card_geometry import extract_candidates, assess, draw_checks, EXPECTED_RATIO
-from prediction_filter import select_indices
+from inference.card_geometry import extract_candidates, assess, draw_checks, EXPECTED_RATIO
+from inference.prediction_filter import select_indices
 
 ROOT=Path(__file__).resolve().parents[2]
 METADATA=ROOT/"data/metadata/green20_cards.csv"
@@ -214,7 +214,7 @@ def run_with_timing_log():
     import sys
     import time
     from datetime import datetime
-    from prediction_history import append_record, import_legacy, HISTORY
+    from inference.prediction_history import append_record, import_legacy, HISTORY
 
     def now():
         return datetime.now().astimezone().isoformat(timespec="seconds")

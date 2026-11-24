@@ -28,7 +28,7 @@ from pathlib import Path
 import torch
 import ultralytics
 from ultralytics import YOLO
-from dataset_inventory import inventory
+from dataset.dataset_inventory import inventory
 
 ROOT=Path(__file__).resolve().parents[2]
 
