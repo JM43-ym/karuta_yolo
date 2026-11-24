@@ -9,7 +9,7 @@ Run: uv run python scripts/build_green20_v3.py
 from __future__ import annotations
 import sys as _sys
 from pathlib import Path as _Path
-_SCRIPTS_DIR = _Path(__file__).resolve().parents[2]
+_SCRIPTS_DIR = _Path(__file__).resolve().parents[1]
 if str(_SCRIPTS_DIR) not in _sys.path:
     _sys.path.insert(0, str(_SCRIPTS_DIR))
 
