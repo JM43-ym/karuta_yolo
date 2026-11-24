@@ -1,4 +1,4 @@
-"""Train YOLO on 360-degree 5-degree-step rotations without mirror flips, and log results.
+"""Train YOLO with pre-generated augmentations, no additional random transforms, and log results.
 
 Example:
  uv run python scripts/train_green20.py --epochs 30 --batch 8 --imgsz 640 --name trial_06
@@ -49,8 +49,8 @@ def main() -> None:
         ap.error("Invalid epochs, batch or imgsz")
     dataset_stats=inventory(data)
     train_count=dataset_stats["splits"].get("train",{}).get("images",0)
-    if train_count!=4320:
-        print(f"NOTE: {train_count} train images. Expected 4320 for the original 3-height 5-degree rotation dataset.")
+    if train_count not in (4320, 8520):
+        print(f"NOTE: Dataset contains {train_count} train images; check against your experiment plan.")
     run_project=ROOT/"runs/green20"
     log_dir=ROOT/"runs/experiment_logs"
     log_dir.mkdir(parents=True,exist_ok=True)
@@ -65,6 +65,7 @@ def main() -> None:
                 imgsz=args.imgsz,device=args.device,workers=args.workers,
                 project=str(run_project),name=run_name,
                 fliplr=0.0,flipud=0.0,degrees=0.0,shear=0.0,perspective=0.0,
+                scale=0.0,translate=0.0,hsv_h=0.0,hsv_s=0.0,hsv_v=0.0,
                 mosaic=0.0,mixup=0.0,copy_paste=0.0)
     record=dict(status="running",started_at=timestamp(),dataset_inventory=dataset_stats,parameters=params,
                 python=sys.version.split()[0],torch=torch.__version__,
@@ -79,7 +80,8 @@ def main() -> None:
                     imgsz=args.imgsz,device=args.device,workers=args.workers,
                     project=str(run_project),name=run_name,exist_ok=False,
                     fliplr=0.0,flipud=0.0,degrees=0.0,
-                    shear=0.0,perspective=0.0,mosaic=0.0,
+                    shear=0.0,perspective=0.0,scale=0.0,translate=0.0,
+                    hsv_h=0.0,hsv_s=0.0,hsv_v=0.0,mosaic=0.0,
                     mixup=0.0,copy_paste=0.0)
         record["status"]="completed"
         metrics=getattr(model,"metrics",None)
