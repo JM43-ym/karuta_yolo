@@ -248,3 +248,4 @@ data/raw/**/*.mkv
 data/raw/**/capture_index.csv
 data/raw/**/extraction_report.csv
 data/annotations/video_frames/
+*.pptx
