@@ -3,9 +3,10 @@
 Use (from repository root):
     uv run --no-sync --with python-pptx python scripts/presentation/create_yolo_results_comparison_slides.py --images-dir "C:/path/to/your/images"
 
-Put the images supplied in ChatGPT in one folder, preserving their filenames.
-All 16 images are included, each once at full-size in appendix, plus comparisons
-in the main section. User-supplied images are NEVER altered.
+Reads original runs/green20/trial_06 and trial_video_aug_01 files automatically,
+or falls back to ChatGPT-exported filenames in reports/analysis_assets.
+Presents new results first, followed by comparisons, recommendations and small appendix.
+User-supplied images are NEVER altered.
 """
 from __future__ import annotations
 import argparse
@@ -151,142 +152,259 @@ def metric_table(sl, old_rows, new_rows, y=2.07):
     txt(sl,6.54,1.74,2.17,.34,"前回",19,BLUE,True,True)
     txt(sl,9.57,1.74,2.20,.34,"今回",19,BLUE,True,True)
 
-def directory(p:Path):
-    if p and p.is_dir(): return p
-    for candidate in (ROOT/"reports"/"analysis_assets", ROOT/"reports"/"source_images", ROOT):
-        if (candidate/OLD["pr"]).is_file(): return candidate
-    raise FileNotFoundError("画像フォルダが見つかりません。--images-dir で16画像とCSVのあるフォルダを指定してください。")
+def resolve_asset(basedir, experiment, kind):
+    """Prefer original runs folders; fall back to ChatGPT-exported filenames."""
+    names = OLD if experiment == "old" else NEW
+    trial = "trial_06" if experiment == "old" else "trial_video_aug_01"
+    original = {
+        "recall":"BoxR_curve.png", "f1":"BoxF1_curve.png",
+        "precision":"BoxP_curve.png", "pr":"BoxPR_curve.png",
+        "cm_norm":"confusion_matrix_normalized.png",
+        "cm":"confusion_matrix.png", "learning":"results.png",
+        "test":"competition_001_pred.png", "csv":"results.csv",
+    }
+    selected = CSV_OLD if experiment == "old" and kind == "csv" else (
+        CSV_NEW if kind == "csv" else names[kind]
+    )
+    # Selected can be a Path, an absolute path, a path relative to ROOT,
+    # or one of the suffixed uploaded filenames.
+    candidates = []
+    p = Path(selected)
+    if p.is_absolute():
+        candidates.append(p)
+    else:
+        candidates.extend([ROOT/p, basedir/p])
+    candidates.append(ROOT/"runs"/"green20"/trial/original[kind])
+    candidates.append(basedir/Path(selected).name)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"必要なファイルがありません ({experiment}/{kind}). 確認した保存先: "
+        + " / ".join(str(p) for p in candidates)
+    )
+
+def single_figure(title, path, lines, footer=None):
+    """Large figure next to statements: observation then interpretation."""
+    sl=slide(title)
+    box(sl,.67,1.23,8.15,5.60,WHITE,LINE)
+    contain(sl,path,.80,1.36,7.89,5.34)
+    box(sl,9.01,1.25,3.52,5.54,PALE,LINE)
+    txt(sl,9.20,1.44,3.13,.47,"グラフから分かること",19,BLUE,True)
+    for i,line in enumerate(lines):
+        yy=2.00+i*.98
+        txt(sl,9.20,yy,3.09,.89,"● "+line,17,NAVY)
+    if footer:
+        notes(sl,footer)
+    return sl
+
+def comparison_figure(title, old, new, observation, warning=None):
+    sl=slide(title,"左：前回 trial_06 ／ 右：今回 trial_video_aug_01")
+    image_pair(sl,old,new,y=1.88,h=4.42)
+    notes(sl,observation)
+    if warning:
+        txt(sl,.88,6.09,11.7,.35,warning,13,MUTED,False,True)
+    return sl
 
 def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--images-dir",type=Path,default=None,help="Directory containing all 16 PNGs and 2 CSVs")
+    ap=argparse.ArgumentParser(description="Generate results-first editable YOLO presentation")
+    ap.add_argument("--images-dir",type=Path,default=ROOT/"reports"/"analysis_assets")
     ap.add_argument("--output",type=Path,default=DEFAULT_OUT)
     a=ap.parse_args()
-    basedir=directory(a.images_dir)
-    required=list(OLD.values())+list(NEW.values())+[CSV_OLD,CSV_NEW]
-    absent=[f for f in required if not (basedir/f).is_file()]
-    if absent: raise FileNotFoundError("以下のファイルがありません:\n"+"\n".join(absent))
-    o=metrics(basedir/CSV_OLD);n=metrics(basedir/CSV_NEW)
+    # The old script required a separate images folder. This version also
+    # reads the original YOLO run folders without copying any PNG/CSV.
+    basedir=a.images_dir
+    old={k:resolve_asset(basedir,"old",k) for k in OLD}
+    new={k:resolve_asset(basedir,"new",k) for k in NEW}
+    oc=resolve_asset(basedir,"old","csv")
+    nc=resolve_asset(basedir,"new","csv")
+    o=metrics(oc)
+    n=metrics(nc)
 
-    # 1 overview
-    sl=slide("YOLO11n 学習結果：改善前後の比較",
-             "前回 trial_06 と今回 trial_video_aug_01（どちらも30 Epoch）")
-    box(sl,.89,1.55,11.55,1.22,PALE)
-    txt(sl,1.16,1.67,10.92,.86,
-        "緑札20クラス：Train 4,320 → 8,520枚／Val 120札 → 180札",22,NAVY,True,True)
-    oldmax=max(num(r,"metrics/mAP50(B)") for r in o)
-    newmax=max(num(r,"metrics/mAP50(B)") for r in n)
-    box(sl,.96,3.07,5.47,1.85,PALE)
-    box(sl,6.78,3.07,5.47,1.85,PALE)
-    txt(sl,1.20,3.36,4.98,1.25,["前回：mAP50 最大",f"{oldmax:.3f}"],27,BLUE,True,True)
-    txt(sl,7.06,3.36,4.90,1.25,["今回：mAP50 最大",f"{newmax:.3f}"],27,GREEN,True,True)
-    txt(sl,1.05,5.23,11.38,.80,[
-       "注意：Validation構成が異なるため、mAP差だけでは厳密なモデル比較にならない。",
-       "改善効果の判定は、同一の独立Test画像・同一推論条件で行う。"],18,NAVY)
+    # 1. Purpose and evaluation conditions (before comparisons)
+    sl=slide("YOLO11n：今回の学習と評価","まず今回の学習結果を示し、その後で前回と比較する")
+    box(sl,.91,1.55,11.49,1.00,PALE)
+    txt(sl,1.12,1.74,11.09,.63,
+        "緑札20クラス／Train 8,520枚／Validation 180枚／30 Epoch",23,NAVY,True,True)
+    items=[
+        ("学習データ","正面20枚＋LR・FB動画200枚から拡張"),
+        ("新しく増やした特徴","斜め視点と遠近変形を含む画像"),
+        ("今回の発表","結果の読み取り → 旧モデル比較 → 課題・改善策"),
+    ]
+    for i,(head,body) in enumerate(items):
+        yy=2.93+i*1.05
+        box(sl,1.04,yy,11.18,.83,PALE)
+        txt(sl,1.27,yy+.10,3.14,.61,head,20,BLUE,True)
+        txt(sl,4.40,yy+.11,7.44,.59,body,19,NAVY)
+    txt(sl,1.07,6.46,11.1,.36,
+        "※ Validationは単札主体の180枚。複数札Testの性能とは区別する。",16,MUTED,False,True)
 
-    # 2 csv
-    sl=slide("学習指標：CSVに基づく数値比較",
-             "Epoch 30 の値と、学習中の最大値を分けて表示")
+    # 2. New model quantitative result, upfront
+    sl=slide("今回の学習結果：数値で確認する","trial_video_aug_01 の results.csv ／ 最終30 Epoch と全Epoch最大値")
+    rows=[
+        ("Precision (30 Epoch)","metrics/precision(B)"),
+        ("Recall (30 Epoch)","metrics/recall(B)"),
+        ("mAP50 (30 Epoch)","metrics/mAP50(B)"),
+        ("mAP50-95 (30 Epoch)","metrics/mAP50-95(B)"),
+    ]
+    for i,(name,key) in enumerate(rows):
+        yy=1.48+i*.88
+        box(sl,1.08,yy,11.05,.70,PALE)
+        txt(sl,1.33,yy+.09,7.3,.51,name,22,NAVY,True)
+        txt(sl,9.01,yy+.09,2.40,.51,f"{num(n[-1],key):.3f}",24,GREEN,True,True)
+    best_m50=max(num(r,"metrics/mAP50(B)") for r in n)
+    best_m5095=max(num(r,"metrics/mAP50-95(B)") for r in n)
+    box(sl,1.13,5.22,10.96,.90,PALE,LINE)
+    txt(sl,1.35,5.31,10.56,.73,
+        f"全Epoch最大：mAP50 {best_m50:.3f} ／ mAP50-95 {best_m5095:.3f}",
+        22,BLUE,True,True)
+    txt(sl,1.19,6.31,10.9,.35,
+        "Precisionは誤検出の少なさ、Recallは見逃しの少なさを示す。",17,MUTED,False,True)
+
+    # 3-10: actual new result images plus interpretations, before old-vs-new
+    single_figure("今回の結果①：学習曲線",new["learning"],[
+        "Trainの位置・分類損失が減少した。",
+        "Validation損失も概ね減少したが変動がある。",
+        "mAP・Precision・Recallは高水準で推移した。",
+    ])
+    single_figure("今回の結果②：PR曲線とmAP50",new["pr"],[
+        "全クラスのmAP50は約0.980。",
+        "右上に近い曲線ほど見逃し・誤検出が少ない。",
+        "札020・023は他の多くの札よりAPが低い。",
+    ])
+    single_figure("今回の結果③：F1と信頼度閾値",new["f1"],[
+        "最大F1は約0.98。",
+        "最大点のConfidenceは約0.886。",
+        "閾値は独立したTest画像でも検証する。",
+    ])
+    single_figure("今回の結果④：混同行列（件数）",new["cm"],[
+        "対角線上に正しい分類が集中する。",
+        "020・023・071などに一部の誤分類が残る。",
+        "右端の背景列に誤検出が見られる。",
+    ])
+    single_figure("今回の結果⑤：正規化混同行列",new["cm_norm"],[
+        "横軸＝正解、縦軸＝予測。",
+        "対角線1.00の札が多い。",
+        "背景列は札ごとの正解率ではない。",
+    ])
+    single_figure("今回の結果⑥：複数札のTest推論",new["test"],[
+        "競技配置の画像でも複数札を検出できる。",
+        "枠がない札や誤分類が残っている。",
+        "正解札番号と照合し、正解数を数える必要がある。",
+    ])
+    single_figure("今回の結果⑦：Precision–Confidence",new["precision"],[
+        "Confidenceを高くするとPrecisionは高くなりやすい。",
+        "ただし検出件数は減少し得る。",
+        "高信頼度＝必ず正解、ではない。",
+    ])
+    single_figure("今回の結果⑧：Recall–Confidence",new["recall"],[
+        "低～中Confidence域でRecallは高い。",
+        "閾値を上げ過ぎると見逃しが急増する。",
+        "F1・Precisionと合わせて閾値を選ぶ。",
+    ])
+
+    # Comparisons, after the result analysis
+    sl=slide("前回学習との比較：まず条件を確認")
+    for i,(name,left,right) in enumerate([
+        ("学習画像枚数","4,320","8,520"),
+        ("斜め画像の学習","なし","LR・FB動画200枚を拡張"),
+        ("Validation対象","60画像・120札","180画像・180札"),
+        ("最終Epoch","30","30"),
+    ]):
+        y=1.55+i*.88
+        box(sl,.99,y,11.38,.68,PALE)
+        txt(sl,1.17,y+.08,4.10,.52,name,19,BLUE,True)
+        txt(sl,5.30,y+.08,2.69,.52,left,18,NAVY,False,True)
+        txt(sl,8.29,y+.08,3.79,.52,right,18,NAVY,True,True)
+    txt(sl,5.28,1.23,2.70,.30,"前回 trial_06",17,BLUE,True,True)
+    txt(sl,8.35,1.23,3.70,.30,"今回 trial_video_aug_01",17,BLUE,True,True)
+    box(sl,1.09,5.55,11.10,.89,PALE,LINE)
+    txt(sl,1.39,5.67,10.56,.67,
+        "重要：Valの構成が異なるので、指標の差だけで厳密な性能向上とは断定しない。",
+        20,NAVY,True,True)
+
+    sl=slide("前回との比較：30 Epoch時点の評価値")
     metric_table(sl,o,n)
-    notes(sl,"※ mAP50最大値とEpoch 30の数値は一致しない場合があります。")
+    notes(sl,"各モデルの異なるValidation結果。厳密比較は共通Test画像で行う。")
 
-    # 3 what charts mean
-    sl=slide("グラフの読み方：どこを見る？")
-    infos=[
-        ("mAP50 / PR曲線","総合性能とクラスごとのAPを見る。右上ほどよい。"),
-        ("F1–Confidence","PrecisionとRecallのバランス。ピークと閾値を見る。"),
-        ("Recall–Confidence","閾値を上げた際に見逃しが増えていないか。"),
-        ("Precision–Confidence","閾値を上げるときの誤検出との兼ね合い。"),
-        ("混同行列","対角線＝正解、非対角＝誤分類、background＝誤検出・未検出。"),
-        ("学習曲線 / Loss","trainとvalの推移。学習不足や過学習の兆候を見る。"),
-    ]
-    for i,(head,body) in enumerate(infos):
-        x=.80+(i%2)*6.13;yy=1.49+(i//2)*1.70
-        box(sl,x,yy,5.84,1.46,PALE,LINE)
-        txt(sl,x+.18,yy+.12,5.48,.36,head,21,BLUE,True)
-        txt(sl,x+.18,yy+.52,5.48,.75,body,17,NAVY)
+    comparison_figure("比較①：学習曲線",old["learning"],new["learning"],
+        "今回のVal側でmAP・Recallが高く、損失の減少も確認できる。",
+        "※ 異なるValを用いた学習曲線の比較")
+    comparison_figure("比較②：PR曲線（mAP50）",old["pr"],new["pr"],
+        "旧：0.759 → 新：0.980。今回のVal上では高い検出性能。",
+        "※ Valが異なるため、差分をそのまま汎化性能の改善率とはしない")
+    comparison_figure("比較③：F1–Confidence",old["f1"],new["f1"],
+        "旧：最大F1 0.59 @0.405 → 新：0.98 @0.886。",
+        "※ 各モデル自身のValに対する最適点であり、Test閾値の確定値ではない")
+    comparison_figure("比較④：正規化混同行列",old["cm_norm"],new["cm_norm"],
+        "今回は正解の対角線が明瞭。混同する札と背景への誤検出にも注目。",
+        "※ 行列の母数は異なるため、件数ではなく傾向を説明する")
+    comparison_figure("比較⑤：複数札Test画像",old["test"],new["test"],
+        "旧モデルは特定の札への予測の偏りが目立つ。新モデルでも未検出は残る。",
+        "※ 必ず正解ラベルと照合して正解・誤分類・未検出・重複を数える")
 
-    # 4 5 6 7 paired graphics
-    for kind,title,subtitle,foot in [
-        ("pr","mAP50：Precision–Recall曲線","各クラスのAPと青太線のmAP50に注目",
-           "旧0.759 → 新0.980。ただし異なるValでの結果。"),
-        ("f1","F1曲線とConfidence閾値","最大F1と、そのときのConfidenceを比較",
-           "旧F1 0.59 @0.405 ／ 新F1 0.98 @0.886。"),
-        ("cm_norm","正規化混同行列の比較","横軸＝正解、縦軸＝予測。対角線を確認",
-           "右端のbackground列は真の札とは別の誤検出を含む。"),
-        ("test","同一Test画像の推論結果","実際の競技に近い複数札配置で比較",
-           "正解数・誤分類・未検出・重複検出は正解ラベルと照合して集計。"),
-    ]:
-        sl=slide(title,subtitle)
-        image_pair(sl,basedir/OLD[kind],basedir/NEW[kind])
-        notes(sl,foot)
-
-    # 8 comparison limitations
-    sl=slide("比較上の注意点と次の評価")
-    sections=[
-      ("Valが異なる","前回は120札、今回は180札。mAPは参考比較として扱う。"),
-      ("推論は同条件で","同じ元画像、画像サイズ、Confidence、NMSなど後処理を統一。"),
-      ("数を集計する","正解札数／未検出／誤分類／重複／誤検出を算出。"),
-      ("苦手な札を分析","今回のValでは023や020のAPが他クラスより低め。"),
-    ]
-    for i,(head,body) in enumerate(sections):
-        y=1.48+i*1.23
-        box(sl,.98,y,11.27,1.01,PALE)
-        txt(sl,1.21,y+.11,3.12,.78,head,21,BLUE,True)
-        txt(sl,4.30,y+.10,7.68,.79,body,19,NAVY)
-
-    # 9 next work
-    sl=slide("現状の課題と認識率向上の方針")
-    goals=[
-     "① 未検出・誤分類・重複・枠ずれをTest画像ごとに分類",
-     "② 苦手な札・角度・照明条件の撮影データを追加",
-     "③ 単札だけでなく、密集配置・異なる背景の複数札を追加",
-     "④ アノテーションを再点検し、独立したTestセットで評価",
-     "⑤ データ拡張や閾値調整は条件を一つずつ変えて検証",
-    ]
-    for i,t in enumerate(goals):
-        yy=1.55+i*.98
-        box(sl,1.02,yy,11.26,.72,PALE)
-        txt(sl,1.26,yy+.08,10.85,.55,t,20,NAVY,True)
-
-    # 10 diary
-    sl=slide("研究日誌・実験履歴の管理",
-             "再現性の確保と、前回実験との比較を容易にするための記録")
+    # Evaluation recommendations & future work
+    sl=slide("比較から言えること・言えないこと")
     for i,(head,body) in enumerate([
-        ("研究日誌CSV","作業日時、研究内容、実験条件、関連コミットを記録"),
-        ("学習履歴","学習条件、モデル、実行日時、指標を記録"),
-        ("推論履歴","使用モデル、対象画像、推論設定、結果を追跡"),
-        ("次の改善","Testの正解数・誤分類・未検出を実験ごとに追記"),
+        ("確認できたこと","今回のValidationで高いmAP・F1を達成。札別の性能差も確認。"),
+        ("推論画像から見えること","特定クラスへの予測偏りが減る一方、未検出・誤分類が残る。"),
+        ("まだ断定できないこと","異なるVal間の数値差がそのまま一般化性能差とは限らない。"),
+        ("次に必要なこと","同じ独立Test画像・推論設定で正解数を定量比較する。"),
+    ]):
+        yy=1.47+i*1.22
+        box(sl,.89,yy,11.52,1.02,PALE)
+        txt(sl,1.14,yy+.11,3.45,.79,head,21,BLUE,True)
+        txt(sl,4.49,yy+.10,7.58,.81,body,18,NAVY)
+
+    sl=slide("今後の課題と認識精度の改善策")
+    for i,(head,body) in enumerate([
+        ("① 未検出を減らす","暗さ・反射・小さい札・密集配置の失敗例を集める。"),
+        ("② 誤分類を減らす","APの低い札020・023などを優先して撮影・確認する。"),
+        ("③ 誤検出を減らす","背景や複数札の配置画像を増やし、閾値・重複抑制も見直す。"),
+        ("④ 比較を公平に","同じTestと同じ後処理を用い、変更は一条件ずつ行う。"),
     ]):
         yy=1.52+i*1.20
-        box(sl,.96,yy,11.42,1.01,PALE)
-        txt(sl,1.21,yy+.11,2.51,.76,head,21,BLUE,True)
-        txt(sl,3.71,yy+.11,8.21,.78,body,19,NAVY)
+        box(sl,1.00,yy,11.27,1.02,PALE)
+        txt(sl,1.23,yy+.10,3.65,.81,head,20,BLUE,True)
+        txt(sl,4.79,yy+.10,7.25,.81,body,18,NAVY)
 
-    # all 16 source plots as readable full-size appendix, original files unmodified
-    for kind in ("learning","pr","f1","precision","recall","cm","cm_norm","test"):
-        for name,mp,source in (("前回 trial_06",OLD,CSV_OLD),
-                               ("今回 trial_video_aug_01",NEW,CSV_NEW)):
-            sl=slide(f"補足：{NAMES[kind]}｜{name}")
-            contain(sl,basedir/mp[kind],.65,1.30,12.03,5.18)
-            notes(sl,EXPL[kind])
-    # Append CSVs as a simple final verification guide
-    sl=slide("出典と数値の取り扱い（補足）")
+    sl=slide("研究日誌・実験履歴の管理",
+        "実験条件や作業時間を記録し、比較の根拠を残す")
     for i,(head,body) in enumerate([
-        ("CSV：旧","results(1).csv／trial_06 に対応"),
-        ("CSV：新","results(2).csv／trial_video_aug_01 に対応"),
-        ("指標の取得","Epoch 30値・全エポック最大値はCSVから計算"),
-        ("評価注意","Val条件が違うため厳密な改善量は同じTestで測定"),
+        ("研究日誌","作業日時・内容・関連ファイル・GitHubコミットをCSV保存"),
+        ("学習履歴","使用データセット・モデル・学習条件・評価値を記録"),
+        ("推論履歴","モデル・対象画像・実行日時を後から確認できる"),
+        ("次回の記録","Testの正解・誤分類・未検出数を同じ形式で追加"),
     ]):
-        yy=1.52+i*1.18
-        box(sl,.96,yy,11.31,.95,PALE)
-        txt(sl,1.20,yy+.13,2.44,.67,head,20,BLUE,True)
-        txt(sl,3.75,yy+.13,8.15,.67,body,19,NAVY)
+        yy=1.51+i*1.17
+        box(sl,1.01,yy,11.25,.96,PALE)
+        txt(sl,1.25,yy+.09,2.84,.77,head,21,BLUE,True)
+        txt(sl,4.06,yy+.10,7.84,.73,body,18,NAVY)
+
+    # Only secondary/nonessential old figures are in appendix.
+    for kind in ("precision","recall","cm"):
+        sl=slide(f"補足：前回の{NAMES[kind]}",
+                 "必要に応じて質問対応に使用")
+        contain(sl,old[kind],.77,1.39,11.74,4.98)
+        notes(sl,EXPL[kind])
+
+    sl=slide("補足：数値の出典と評価上の注意")
+    for i,(head,body) in enumerate([
+        ("前回CSV",str(oc)),
+        ("今回CSV",str(nc)),
+        ("計算方法","最終Epoch値と各Epoch中の最大値を区別して表示"),
+        ("比較条件","Valが異なるため、共通の独立Testで差を再評価"),
+    ]):
+        yy=1.51+i*1.16
+        box(sl,.92,yy,11.45,.96,PALE)
+        txt(sl,1.14,yy+.12,2.14,.70,head,19,BLUE,True)
+        txt(sl,3.19,yy+.12,8.85,.70,body,16,NAVY)
 
     a.output.parent.mkdir(parents=True,exist_ok=True)
     prs.save(str(a.output))
-    print(f"PowerPoint created: {a.output} ({len(prs.slides)} slides)")
-    print("16 attached images included in appendix; all slide text and boxes are editable.")
+    print(f"Created {len(prs.slides)} slides: {a.output}")
+    print("Results first, then old-vs-new comparison, improvements, diary, brief appendix.")
+    print("Original images are unchanged; explanatory boxes and text remain editable.")
 
 if __name__=="__main__":
     main()
