@@ -23,27 +23,27 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = ROOT / "reports" / "YOLO_trial06_vs_video_aug_results_editable.pptx"
 OLD = {
-    "recall": "BoxR_curve(2).png",
-    "f1": "BoxF1_curve(2).png",
-    "precision": "BoxP_curve(2).png",
-    "pr": "BoxPR_curve(1).png",
-    "cm_norm": "confusion_matrix_normalized(1).png",
-    "cm": "confusion_matrix(3).png",
-    "learning": "results(6).png",
-    "test": "competition_001_pred(1).png",
+    "recall": "runs/green20/trial_06/BoxR_curve.png",
+    "f1": "runs/green20/trial_06/BoxF1_curve.png",
+    "precision": "runs/green20/trial_06/BoxP_curve.png",
+    "pr": "runs/green20/trial_06/BoxPR_curve.png",
+    "cm_norm": "runs/green20/trial_06/confusion_matrix_normalized.png",
+    "cm": "runs/green20/trial_06/confusion_matrix.png",
+    "learning": "runs/green20/trial_06/results.png",
+    "test": "runs/green20_labeled/trial_06_competition/competition_001_pred.png",
 }
 NEW = {
-    "recall": "BoxR_curve(3).png",
-    "f1": "BoxF1_curve(3).png",
-    "precision": "BoxP_curve(3).png",
-    "pr": "BoxPR_curve(2).png",
-    "cm_norm": "confusion_matrix_normalized(2).png",
-    "cm": "confusion_matrix(4).png",
-    "learning": "results(7).png",
-    "test": "competition_001_pred(2).png",
+    "recall": "runs/green20/trial_video_aug_01/BoxR_curve.png",
+    "f1": "runs/green20/trial_video_aug_01/BoxF1_curve.png",
+    "precision": "runs/green20/trial_video_aug_01/BoxP_curve.png",
+    "pr": "runs/green20/trial_video_aug_01/BoxPR_curve.png",
+    "cm_norm": "runs/green20/trial_video_aug_01/confusion_matrix_normalized.png",
+    "cm": "runs/green20/trial_video_aug_01/confusion_matrix.png",
+    "learning": "runs/green20/trial_video_aug_01/results.png",
+    "test": "runs/green20_labeled/trial_video_aug_01/competition_001_pred.png",
 }
-CSV_OLD = "results(1).csv"
-CSV_NEW = "results(2).csv"
+CSV_OLD = "runs/green20/trial_06/results.csv"
+CSV_NEW = "results.csv"
 NAMES = {
     "recall":"Recall–Confidence", "f1":"F1–Confidence",
     "precision":"Precision–Confidence", "pr":"Precision–Recall",
