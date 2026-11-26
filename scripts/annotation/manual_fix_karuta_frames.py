@@ -48,8 +48,7 @@ def main():
         groups = {int(r["card_id"]): r["group_id"] for r in csv.DictReader(f)}
     src = ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction/args.frame_set
     base = ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"
-    if args.frame_set != "front_45":
-        base = base/args.frame_set
+    base = base/args.frame_set
     out = base/f"{args.direction}_annotated"
     if not src.is_dir() or not out.is_dir():
         ap.error("Missing extracted images or annotation folder. Run annotate_karuta_frames.py first.")
