@@ -205,3 +205,18 @@ uv run --no-sync python scripts/annotation/review_karuta_annotations.py --color 
 ```
 
 `build_green20_video_augmented.py` も既定では `front_45` を参照する。新しい近正面画像には `--frame-set near_front_15` を指定する。ただしビルド実行前に新しいラベルの目視確認が必須。
+
+
+## 正面候補を3枚目にする再抽出（2026-11-26）
+
+`near_front_15` 抽出は、各動画の中央近辺（画像変化進行度0.5 ±0.30）から**札の白面四隅の形状**を評価して正面候補を自動選択し、その前後2枚ずつ計5枚を時系列に並べる。**3枚目が推定正面**になるが、実際の角度0°を保証するものではない。撮影範囲±45°も目測であり、±15°は近似範囲。
+
+現在の `near_front_15` のPNGを**意図して置換**する場合だけ以下を実行する。旧 `front_45` と元動画は変更しない。
+
+```powershell
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR --selection near-front --per-video 5 --sweep-half-angle 45 --max-angle 15 --replace
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction FB --selection near-front --per-video 5 --sweep-half-angle 45 --max-angle 15 --replace
+```
+
+出力先: `data/raw/green20/train/single/oblique/extracted/h01_s01/LR/near_front_15/` と `FB/near_front_15/`。
+既存の `near_front_15` アノテーションがある場合、**画像の選び直しにより以前のラベルは無効**。再アノテーション・目視レビューを行うまでデータセット生成しない。コンソールの `WARNING` の動画は5枚選べなかったものなので、旧画像があればそれはそのまま残る。フォルダ全体の結果に混在がないか確認する。
