@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ANGLES = ("L30","L45","R30","R45","F30","F45","B30","B45")
 IMAGE = re.compile(r"^card_(\d{3})_(L30|L45|R30|R45|F30|F45|B30|B45)_s02\.(png|jpg|jpeg)$",re.I)
 SOURCE = ROOT/"data/raw/green20/train/single/oblique/h01_s01"
-OUTPUT = ROOT/"data/annotations/green20_fixed_angle_val"
+OUTPUT = ROOT/"data/annotations/green20/green20_fixed_angle_val"
 FIELDS = ("image","card_id","group_id","class_id","status","method",
           "score","corner_points_px")
 EXTS = (".png",".jpg",".jpeg")
