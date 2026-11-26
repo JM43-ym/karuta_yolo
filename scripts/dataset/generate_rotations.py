@@ -29,7 +29,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data/raw/green20"
-ANNOTATIONS = ROOT / "data/annotations"
+ANNOTATIONS = ROOT / "data/annotations/green20"
 DEFAULT_OUTPUT = ROOT / "data/datasets/green20_v2"
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
 HEADERS = ("filename", "card_id", "class_id", "status", "corner_points_px")
