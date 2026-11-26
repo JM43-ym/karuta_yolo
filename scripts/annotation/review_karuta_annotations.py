@@ -50,8 +50,7 @@ def main():
             frames = (ROOT / "data/raw" / args.color / "train/single/oblique/extracted" /
                       f"h01_{args.session}" / direction / args.frame_set)
             base = out / f"h01_{args.session}"
-            if args.frame_set != "front_45":
-                base = base / args.frame_set
+            base = base / args.frame_set
             annotations = base / (direction + "_annotated")
             preview_dir = annotations / "previews"
             label_dir = annotations / "labels"
