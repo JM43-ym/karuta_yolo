@@ -232,6 +232,8 @@ def main():
             ap.error("--front-progress must be between 0 and 1")
         if args.output_subdir is None:
             args.output_subdir = "near_front_15" if args.max_angle == 15 else f"near_front_{args.max_angle:g}"
+    if args.output_subdir is None:
+        args.output_subdir = "front_45"
     if args.output_subdir is not None and (not re.fullmatch(r"[A-Za-z0-9_-]+", args.output_subdir)
                                          or args.output_subdir in (".", "..")):
         ap.error("--output-subdir must contain only letters, numbers, underscores or hyphens")
