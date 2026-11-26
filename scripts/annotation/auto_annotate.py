@@ -42,7 +42,8 @@ def save_image(path: Path, image: np.ndarray) -> None:
     encoded.tofile(str(path))
 
 
-def candidate_rects(image: np.ndarray, border_width: float, border_height: float) -> list[tuple[float, np.ndarray, str]]:
+def candidate_rects(image: np.ndarray, border_width: float, border_height: float,
+                    bright_threshold: int = 105) -> list[tuple[float, np.ndarray, str]]:
     """Detect white face then estimate outer edge with an adjustable expansion.
 
     NOTE: expanded rectangle is an estimate; review every preview.
@@ -51,7 +52,7 @@ def candidate_rects(image: np.ndarray, border_width: float, border_height: float
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     _, otsu = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    bright = cv2.inRange(gray, 105, 255)
+    bright = cv2.inRange(gray, bright_threshold, 255)
     kernel_size = max(3, round(min(height, width) * 0.012))
     if kernel_size % 2 == 0:
         kernel_size += 1
@@ -102,6 +103,8 @@ def main() -> None:
                         help="Relative expansion across short side (default 0.10)")
     parser.add_argument("--border-height", type=float, default=0.06,
                         help="Relative expansion along long side (default 0.06)")
+    parser.add_argument("--bright-threshold", type=int, default=105,
+                        help="Lower grayscale threshold for white_bright (0-255; default 105). Otsu is unchanged.")
     parser.add_argument("--session", default="s01", help="Session ID, e.g. s01")
     parser.add_argument("--split", choices=["train","val","test"], default=None,
                         help="Raw data split (default: train for s01, val for s02)")
@@ -112,6 +115,8 @@ def main() -> None:
     args = parser.parse_args()
     if not (0 <= args.border_width <= 0.30 and 0 <= args.border_height <= 0.30):
         parser.error("Expansion fractions must be between 0 and 0.30")
+    if not 0 <= args.bright_threshold <= 255:
+        parser.error("--bright-threshold must be between 0 and 255")
     if not re.fullmatch(r"s\d{2}", args.session):
         parser.error("--session must look like s01 or s02")
     split=args.split or ("train" if args.session=="s01" else "val")
@@ -150,7 +155,8 @@ def main() -> None:
                 raise ValueError("Filename has no known green20 card ID")
             if f"_top_{args.height}_{args.session}" not in path.stem:
                 raise ValueError("Filename does not match selected height/session")
-            candidates = candidate_rects(image, args.border_width, args.border_height)
+            candidates = candidate_rects(image, args.border_width, args.border_height,
+                                         args.bright_threshold)
             if not candidates:
                 raise ValueError("No suitable white card face found; inspect source image")
             score, corners, method = candidates[0]
