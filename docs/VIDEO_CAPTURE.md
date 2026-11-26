@@ -241,3 +241,35 @@ start data/raw/green20/train/single/oblique/extracted/h01_s01/FB/near_front_15/e
 ## 2026-11-26 旧アノテーション front_45 への移動
 
 ユーザーが旧 `LR_annotated/`・`FB_annotated/` を `data/annotations/video_frames/green20/h01_s01/front_45/` に整理したため、`annotate_karuta_frames.py`、`manual_fix_karuta_frames.py`、`review_karuta_annotations.py`、`build_green20_video_augmented.py` のアノテーション参照先を `frame_set` 配下に統一した。`near_front_15` は従来通り独立した出力先で保持する。
+
+
+## 2026-11-26 新データセット：near_front_15 + 多札 Val
+
+旧モデル・既存データセットは上書きしない。新スクリプト `scripts/dataset/build_green20_near_front_multi_val.py` では、Train を near_front_15 動画200枚×3倍率×7回転（-15°〜15°、5°刻み）=4,200枚、h01_s01 正面単札20枚×3倍率×72回転（0°〜355°、5°刻み）=4,320枚、計**8,520枚**作成。倍率は h01_s01/h02_s01/h03_s01 の札の相対面積から再計算。Val は独立した正面上方撮影 h03_s02 20枚（`--val-height h01` を指定すれば h01_s02 に切替）＋ `two_cards` 20枚＋`three_cards` 20枚の**60枚**。すべての多札ラベルは `data/annotations/green20/green20_h03_multi_val/labels` を使う。Test 画像は一切含めない。独立撮影であることと多札枠の正しさは要目視確認。
+
+チェックのみ（画像は作成しない）：
+
+```powershell
+uv run --no-sync python scripts/dataset/build_green20_near_front_multi_val.py
+```
+
+チェック成功後、Valの独立性を確認してから作成：
+
+```powershell
+uv run --no-sync python scripts/dataset/build_green20_near_front_multi_val.py --build --confirm-independent-val
+```
+
+出力：`data/datasets/green20_near_front_multi_val/data.yaml`。同名フォルダが存在する場合は上書きしない。学習実行例：
+
+```powershell
+uv run --no-sync python scripts/training/train_green20.py --data data/datasets/green20_near_front_multi_val/data.yaml --name trial_near_front_multi_01 --epochs 30 --batch 8 --imgsz 640
+```
+
+Val のラベルを**札番号ごとにHTMLで確認**（画像を変更しない）：
+
+```powershell
+uv run --no-sync python scripts/dataset/review_dataset_labels.py --data data/datasets/green20_near_front_multi_val/data.yaml --split val
+start runs/label_reviews/green20_near_front_multi_val/val/label_gallery.html
+```
+
+Trainも `--split train` で確認可能。8,520枚すべてを処理する場合は多くのサムネイルが生成される。まずは `--max-per-class 15` などでHTML表示件数を制限してもよい（ただし画像の読み込み・サムネイル作成は全件）。
