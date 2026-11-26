@@ -63,8 +63,8 @@ uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20
 
 `--sweep-half-angle` は撮影した動画の**片側の最大角度**（度）であり、60は例示値であって実測値ではない。実際の撮影範囲に合わせて指定する。正面が進行度0.5以外の場合は `--front-progress` を変更できるが、基準は動画を目視して決める。撮影速度・照明変化・往復運動によってズレる可能性がある。
 
-新しい画像は従来の `LR/` と `FB/` の直下ではなく、各 `near_front_15/` サブフォルダへ保存する。従来の抽出PNG・ラベル・元動画は変更しない。
-新しい画像は**改めてアノテーションする必要がある**。既存のアノテーションスクリプトとデータセットビルダーはまだ `near_front_15/` を参照しないので、既存のラベルを流用したり、そのまま学習に入れたりしないこと。
+旧方式の抽出画像は各 `LR/front_45/`・`FB/front_45/` に整理する。新しい正面付近の画像は各 `near_front_15/` サブフォルダへ保存する。元動画は変更しない。
+新しい画像は**改めてアノテーションする必要がある**。`--frame-set near_front_15` を指定すると、アノテーションは `data/annotations/video_frames/<color>/h01_s01/near_front_15/LR_annotated/`（FBも同様）へ分けて保存する。旧画像 (`front_45`) の既存アノテーションは従来の `LR_annotated/` と `FB_annotated/` に残す。新データセット生成時は `--frame-set near_front_15 --output data/datasets/green20_near_front_15` を指定し、旧データセットに上書きしない。生成前に全件の確認と独立Val確認が必要。
 
 ### ③ 自動アノテーション
 
@@ -190,3 +190,18 @@ uv run --no-sync python scripts/dataset/build_green20_video_augmented.py --build
 ## 用途別フォルダへの実装移動（2026-11-24）
 
 撮影GUI: `scripts/gui/capture_karuta_video.py` / 動画フレーム抽出: `scripts/capture/extract_karuta_frames.py` / 動画アノテーション: `scripts/annotation/annotate_karuta_frames.py` / 手動修正: `scripts/annotation/manual_fix_karuta_frames.py`。旧パスの互換ラッパーは削除済みです。詳しくは [スクリプトのフォルダ整理](SCRIPT_ORGANIZATION.md) を参照してください。
+
+
+## 旧抽出画像の front_45 整理（2026-11-26）
+
+旧画像ファイルを `data/raw/<color>/train/single/oblique/extracted/h01_s01/LR/front_45/` と `FB/front_45/` に移す。既存の `extraction_report.csv` は各方向の `front_45/` へ移す（残っている場合）。
+
+この変更に合わせて `annotate_karuta_frames.py`、`manual_fix_karuta_frames.py`、`review_karuta_annotations.py` は `--frame-set front_45` が既定。旧アノテーションは移動しない。新規 `near_front_15` はそれぞれ `--frame-set near_front_15` を付ける。
+
+```powershell
+uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction LR --frame-set near_front_15
+uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction FB --frame-set near_front_15
+uv run --no-sync python scripts/annotation/review_karuta_annotations.py --color green20 --frame-set near_front_15
+```
+
+`build_green20_video_augmented.py` も既定では `front_45` を参照する。新しい近正面画像には `--frame-set near_front_15` を指定する。ただしビルド実行前に新しいラベルの目視確認が必須。
