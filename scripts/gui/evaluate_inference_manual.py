@@ -1,5 +1,5 @@
 """Manual YOLO inference audit GUI: 10 test images, 5x4 missed positions,
-and 20x20 true-vs-predicted misclassification matrix.
+20 missed card IDs and 20x20 true-vs-predicted misclassification matrix.
 
 From repository root:
     uv run --no-sync python scripts/gui/evaluate_inference_manual.py
@@ -48,11 +48,21 @@ def new_data():
             {
                 "name": f"テスト画像 {i+1:02d}",
                 "missing": [[0 for _ in range(COLS)] for _ in range(ROWS)],
+                "missing_cards": [0 for _ in range(20)],
                 "misclassified": [[0 for _ in range(20)] for _ in range(20)],
             }
             for i in range(N_IMAGES)
         ],
     }
+
+
+def migrate(data):
+    """Add missed-card counts to older saved projects without losing existing data."""
+    if isinstance(data, dict) and isinstance(data.get("images"), list):
+        for item in data["images"]:
+            if isinstance(item, dict) and "missing_cards" not in item:
+                item["missing_cards"] = [0] * 20
+    return data
 
 
 def validate(data):
@@ -70,6 +80,10 @@ def validate(data):
                     type(x) is not int or x < 0 for x in row
                 ):
                     raise ValueError(f"画像{index}: {field} に不正なカウントがあります")
+        counts = item.get("missing_cards")
+        if (not isinstance(counts, list) or len(counts) != 20 or
+                any(type(x) is not int or x < 0 for x in counts)):
+            raise ValueError(f"画像{index}: 未検出札の件数が不正です")
         if any(item["misclassified"][i][i] != 0 for i in range(20)):
             raise ValueError(f"画像{index}: 誤分類表の対角線に値があります")
 
@@ -96,7 +110,7 @@ class App:
         self.data = new_data()
         if self.path.exists():
             with self.path.open(encoding="utf-8") as f:
-                self.data = json.load(f)
+                self.data = migrate(json.load(f))
             validate(self.data)
 
         self.selected = 0  # 0..9 for a test image; 10 for aggregate
@@ -105,12 +119,13 @@ class App:
         self.view_var = tk.StringVar()
         self.totals_var = tk.StringVar()
         self.miss_buttons = []
+        self.missed_card_buttons = []
         self.matrix_buttons = []
         self.pred_count_labels = []
         self.actual_count_labels = []
 
         root.title("YOLO 推論結果：手動集計（緑20札 / テスト画像10枚）")
-        root.geometry("1440x870")
+        root.geometry("1550x950")
         root.minsize(1090, 640)
         root.configure(bg=BG)
         self.build()
@@ -146,9 +161,9 @@ class App:
         self.workspace = ttk.Panedwindow(self.root, orient="horizontal")
         self.workspace.pack(fill="both", expand=True, padx=10, pady=4)
 
-        left = ttk.LabelFrame(self.workspace, text="未検出：位置別カウント（5行 × 4列）", padding=12)
+        left = ttk.LabelFrame(self.workspace, text="未検出：位置と札番号", padding=10)
         right = ttk.LabelFrame(self.workspace, text="誤分類：縦＝正解札 ／ 横＝予測札（20 × 20）", padding=8)
-        self.workspace.add(left, weight=1)
+        self.workspace.add(left, weight=2)
         self.workspace.add(right, weight=3)
 
         ttk.Label(left, text="画像の上側", font=("Yu Gothic UI", 10)).pack(pady=(0, 7))
@@ -170,8 +185,22 @@ class App:
         ttk.Separator(left).pack(fill="x", pady=3)
         ttk.Label(left, text="位置ごとの未検出件数を入力します。\n1枚のテスト画像で複数件あれば、その分クリックしてください。",
                   justify="left", wraplength=295).pack(anchor="w", pady=8)
-        ttk.Label(left, text="※ マスの配置は画像上の位置に対応させてください。\n　行：上→下、列：左→右",
-                  foreground="#526c80", justify="left").pack(anchor="w", pady=8)
+        ttk.Label(left, text="※ 行：上→下、列：左→右", foreground="#526c80").pack(anchor="w", pady=(0, 6))
+        ttk.Separator(left).pack(fill="x", pady=(5, 10))
+        ttk.Label(left, text="未検出した札（札番号・決まり字）", font=("Yu Gothic UI", 12, "bold")).pack(anchor="w")
+        ttk.Label(left, text="未検出の札をクリックして記録します。位置と札は別々にカウントします。",
+                  foreground="#526c80", wraplength=390, justify="left").pack(anchor="w", pady=(3, 8))
+        card_grid = ttk.Frame(left)
+        card_grid.pack(fill="x")
+        for i, (card_id, prefix) in enumerate(self.cards):
+            b = tk.Button(card_grid, text=f"{card_id} {prefix}\n0件", font=("Yu Gothic UI", 10),
+                          bg="#edf4ff", activebackground="#b7d8fa", fg=DARK,
+                          width=13, height=2, relief="ridge", bd=1, cursor="hand2")
+            b.grid(row=i // 4, column=i % 4, padx=2, pady=2, sticky="nsew")
+            b.bind("<Button-1>", lambda e, n=i: self.click_missed_card(n, -1 if e.state & 0x1 else 1))
+            b.bind("<Button-3>", lambda e, n=i: self.click_missed_card(n, -1))
+            card_grid.columnconfigure(i % 4, weight=1)
+            self.missed_card_buttons.append(b)
 
         # Two-axis scrolling lets the complete 20x20 matrix remain usable
         # without shrinking the Japanese card labels too far.
@@ -242,6 +271,7 @@ class App:
         out = {
             "name": "10枚合計",
             "missing": [[0]*COLS for _ in range(ROWS)],
+            "missing_cards": [0]*20,
             "misclassified": [[0]*20 for _ in range(20)],
         }
         for item in self.data["images"]:
@@ -249,6 +279,7 @@ class App:
                 for c in range(COLS):
                     out["missing"][r][c] += item["missing"][r][c]
             for r in range(20):
+                out["missing_cards"][r] += item["missing_cards"][r]
                 for c in range(20):
                     out["misclassified"][r][c] += item["misclassified"][r][c]
         return out
@@ -296,6 +327,14 @@ class App:
         self.persist()
         self.refresh()
 
+    def click_missed_card(self, index, delta):
+        if self.selected == N_IMAGES:
+            return
+        counts = self.data["images"][self.selected]["missing_cards"]
+        counts[index] = max(0, counts[index] + delta)
+        self.persist()
+        self.refresh()
+
     def show_pair(self, actual, predicted):
         true_id, true_prefix = self.cards[actual]
         pred_id, pred_prefix = self.cards[predicted]
@@ -328,6 +367,13 @@ class App:
                 b = self.miss_buttons[r][c]
                 b.configure(text=str(val), bg="#74d19c" if val else GREEN,
                             fg=DARK, cursor="arrow" if aggregate else "hand2")
+        for i, (card_id, prefix) in enumerate(self.cards):
+            count = item["missing_cards"][i]
+            self.missed_card_buttons[i].configure(
+                text=f"{card_id} {prefix}\n{count}件",
+                bg="#b8d8ff" if count else "#edf4ff",
+                cursor="arrow" if aggregate else "hand2"
+            )
         for i in range(20):
             total = 0
             for j in range(20):
@@ -346,14 +392,16 @@ class App:
             total_mis += total
         self.grand_total.configure(text=str(total_mis))
         total_missing = sum(sum(line) for line in item["missing"])
+        total_missed_cards = sum(item["missing_cards"])
         done = sum(
             any(v for row in im["missing"] for v in row)
             or any(v for row in im["misclassified"] for v in row)
+            or any(im["missing_cards"])
             for im in self.data["images"]
         )
         self.totals_var.set(
             f"{'10枚合計' if aggregate else item['name']}　｜　"
-            f"未検出：{total_missing}件　　誤分類：{total_mis}件　　"
+            f"未検出位置：{total_missing}件　　未検出札：{total_missed_cards}件　　誤分類：{total_mis}件　　"
             f"入力あり：{done}/10画像"
         )
 
@@ -370,19 +418,23 @@ class App:
 
         data = self.data["images"] + [self.aggregate()]
         missing_rows = []
+        missed_cards_rows = []
         confusion_rows = []
         matrix_rows = []
         summary_rows = []
         for ix, item in enumerate(data):
             image_id = f"{ix+1:02d}" if ix < N_IMAGES else "TOTAL"
             missing_n = sum(sum(x) for x in item["missing"])
+            missed_cards_n = sum(item["missing_cards"])
             wrong_n = sum(sum(x) for x in item["misclassified"])
-            summary_rows.append([image_id, item["name"], missing_n, wrong_n])
+            summary_rows.append([image_id, item["name"], missing_n, missed_cards_n, wrong_n])
             for row in range(ROWS):
                 for col in range(COLS):
                     missing_rows.append([image_id, item["name"], row+1, col+1,
                                          item["missing"][row][col]])
             for i,(actual_id,actual_prefix) in enumerate(self.cards):
+                missed_cards_rows.append([image_id, item["name"], actual_id, actual_prefix,
+                                          item["missing_cards"][i]])
                 matrix_rows.append([image_id, item["name"], actual_id, actual_prefix]
                                    + item["misclassified"][i])
                 for j,(pred_id,pred_prefix) in enumerate(self.cards):
@@ -391,17 +443,19 @@ class App:
                         confusion_rows.append([image_id,item["name"],
                                                actual_id,actual_prefix,pred_id,pred_prefix,n])
         csv_write(dest/"evaluation_summary.csv",
-                  ["image_id","image_name","missed_count","misclassified_count"],summary_rows)
+                  ["image_id","image_name","missed_position_count","missed_card_count","misclassified_count"],summary_rows)
         csv_write(dest/"missed_positions.csv",
                   ["image_id","image_name","row_top_to_bottom","column_left_to_right","count"],missing_rows)
+        csv_write(dest/"missed_cards.csv",
+                  ["image_id","image_name","card_id","decision_prefix","count"],missed_cards_rows)
         csv_write(dest/"misclassification_pairs.csv",
                   ["image_id","image_name","true_card_id","true_prefix",
                    "predicted_card_id","predicted_prefix","count"],confusion_rows)
         csv_write(dest/"misclassification_matrix.csv",
                   ["image_id","image_name","true_card_id","true_prefix"]
                   + [f"pred_{cid}" for cid,_ in self.cards],matrix_rows)
-        self.status_var.set(f"CSVを4ファイル出力しました：{dest}")
-        messagebox.showinfo("CSV出力完了", f"4ファイルを保存しました。\n{dest}")
+        self.status_var.set(f"CSVを5ファイル出力しました：{dest}")
+        messagebox.showinfo("CSV出力完了", f"5ファイルを保存しました。\n{dest}")
 
     def save_as(self):
         filename = filedialog.asksaveasfilename(
@@ -422,7 +476,7 @@ class App:
             return
         try:
             with Path(filename).open(encoding="utf-8") as f:
-                new = json.load(f)
+                new = migrate(json.load(f))
             validate(new)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             messagebox.showerror("読み込み失敗", str(exc))
