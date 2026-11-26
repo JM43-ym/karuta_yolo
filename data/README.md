@@ -36,9 +36,9 @@ uv run python scripts/auto_annotate.py --session s01
 uv run python scripts/auto_annotate.py --session s02
 ```
 
-それぞれ `data/annotations/green20_h01_s01/` と `data/annotations/green20_h01_s02/` に `labels/`・`previews/`・`report.csv` を出力します。**元画像は変更されません。**
+それぞれ `data/annotations/green20/green20_h01_s01/` と `data/annotations/green20/green20_h01_s02/` に `labels/`・`previews/`・`report.csv` を出力します。**元画像は変更されません。**
 
-以前の `data/annotations/green20_h01/` は旧版の出力です。新しいフォルダへ自動移動・上書きされません。新しいプレビューを確認してから扱ってください。
+以前の `data/annotations/green20/green20_h01/` は旧版の出力です。新しいフォルダへ自動移動・上書きされません。新しいプレビューを確認してから扱ってください。
 
 自動アノテーションは仮ラベルです。四隅とバウンディングボックスを各画像で目視確認し、必要な修正を終えてから学習に使ってください。
 
@@ -132,7 +132,7 @@ uv run python scripts/auto_annotate.py --height h03 --session s02
 uv run python scripts/annotate_multi_val.py
 ```
 
-`data/annotations/green20_h03_multi_val/previews/` に40枚分の確認画像、
+`data/annotations/green20/green20_h03_multi_val/previews/` に40枚分の確認画像、
 `report.csv` に検出状態を出力する。必ず各札の外枠と左→右の札番号を確認する。
 **FAIL画像はラベルを生成しない。REVIEWも未承認の仮ラベルである。**
 札が接している影響で自動検出できない場合は手動修正が必要。
