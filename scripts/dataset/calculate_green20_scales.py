@@ -4,7 +4,7 @@ Safe/read-only for images and annotations. Does not build any dataset.
 Run:
   uv run --no-sync python scripts/dataset/calculate_green20_scales.py
 Output:
-  reports/green20_scales_YYYYMMDD_HHMMSS.csv
+  data/metadata/scales/green20_scales_YYYYMMDD_HHMMSS.csv
 """
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def measure(height: str, session: str, expected_ids: set[int]):
 
 def main():
     ap = argparse.ArgumentParser(description="緑20札のh01/h02/h03倍率を再計算（画像の変更なし）")
-    ap.add_argument("--output", type=Path, default=None, help="出力CSVのパス（省略時はreports/に日時付きで保存）")
+    ap.add_argument("--output", type=Path, default=None, help="出力CSVのパス（省略時はdata/metadata/scales/に日時付きで保存）")
     args = ap.parse_args()
     with METADATA.open(encoding="utf-8-sig", newline="") as f:
         ids = {int(row["card_id"]) for row in csv.DictReader(f)}
@@ -103,7 +103,7 @@ def main():
         print(f"{h}: size={samples[h]:.7f} / scale={scale_values[h]:.5f}")
     print("※ 20札の sqrt(札四角形面積/画像面積) の中央値を使用")
     output = (args.output or
-              ROOT / "reports" / f"green20_scales_{datetime.now():%Y%m%d_%H%M%S}.csv")
+              ROOT / "data/metadata/scales" / f"green20_scales_{datetime.now():%Y%m%d_%H%M%S}.csv")
     if not output.is_absolute():
         output = ROOT / output
     if output.exists():
