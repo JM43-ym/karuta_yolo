@@ -46,11 +46,11 @@ data/raw/green20/test/multi/
 
 現在の `scripts/dataset/build_green20_video_augmented.py` では、h01/h02/h03の**札面積 / 画像面積の平方根**の中央値で札の見かけの大きさを測り、h01=1を基準にh02/h01・h03/h01の倍率を求める。過去の日誌では2026-11-20時点の旧値が `h01=1.00000, h02=0.56481, h03=0.37612` だったが、再撮影後は再計算が必要。
 
-- 旧 `data/raw/green20/train/single/top/h01_s01/` と対応する `data/annotations/green20_h01_s01/` を残す。
-- 新しいh01は、例えば **`data/raw/green20/train/single/top/h01_s03/`** に保存する（フォルダは撮影前に確定）。
+- 旧撮影画像は `data/raw/green20/train/single/top/h01_s03/` で保存し、旧アノテーションも新s01のものと区別して保管する。旧ファイル名の `s01` 表記は中身と一致するよう整理する。
+- **新しいh01は `data/raw/green20/train/single/top/h01_s01/`** に撮影し直す。旧h01は `h01_s03/` に保存し、新s01の画像やアノテーションとは混ぜない。
 - 新しいh01の全20枚について、札番号と四隅アノテーションを再取得・目視確認する。
 - h02/h03は従来の撮影を使う場合、両者の撮影条件の違い・画角・解像度・光量に注意する。
-- 現行データセット生成スクリプトはh01の`s01`を固定参照している。**新しい`s03`をそのまま置いただけでは再計算に反映されない**。入力セッションを指定できるように改修してから倍率を再計算する。
+- 現行データセット生成スクリプトはh01の`s01`を固定参照している。**新しい`s01`を撮影・アノテーションした後で再計算する。** 旧s03は比較・保管用とし、新規学習用の読み込み先には使わない。
 - 新データセットは旧 `data/datasets/green20_video_augmented/` に上書きせず、別名で作成する。新しいアノテーションと動画抽出の変更分を含めてから生成する。
 
 ## 4. 比較のポイント
@@ -58,3 +58,26 @@ data/raw/green20/test/multi/
 - 札の密着と間隔ありそれぞれで、未検出位置・未検出札・誤分類を10画像単位で集計する。
 - 同じモデル・同じ`imgsz`・同じ`conf`で配置条件だけを比較する。
 - 従来モデルと正面近傍モデルの比較では、学習画像枚数や検証条件の差を記録し、どの変更が効いたか解釈できるようにする。
+
+## 5. 2026-11-26 追加：学習条件の検討
+
+ゼミでBatch 32への増加、学習入力サイズの再検討、グレースケール学習の可能性についても指摘があった。
+
+| 比較項目 | 従来条件 | 比較候補（未実施） |
+|---|---|---|
+| Batch | 8 | 16、32 |
+| imgsz | 640 | 960、1280 |
+| 色 | カラー | グレースケールを3チャンネル複製して使用する方式など |
+
+実験条件は1項目ずつ変更して比較する。GPUメモリ（RTX 5080 Laptop 16GB）の空き容量を確認する。Batch 32は自動的に精度向上を意味せず、学習時間・勾配更新回数・汎化性能も比較する。画像サイズの拡大は、元画像に存在しない細部の情報を生成しない。
+
+グレースケール比較ではYOLOモデルの入力チャンネル仕様と学習・推論の前処理を統一する。カラー画像のまま学習したモデルに推論時だけグレースケールを与えても、公正な比較にはならない。旧モデルと新モデルは分けて保存する。
+
+## 6. 推論時の新しいパス
+
+```powershell
+uv run --no-sync python scripts/inference/predict_green20.py --model runs/green20/trial_video_aug_01/weights/best.pt --source data/raw/green20/test/multi/competition/touching --imgsz 1280 --conf 0.25
+uv run --no-sync python scripts/inference/predict_green20.py --model runs/green20/trial_video_aug_01/weights/best.pt --source data/raw/green20/test/multi/competition/spaced --imgsz 1280 --conf 0.25 --output runs/green20_labeled/spaced
+```
+
+`--source` は必須で、ユーザーが指定した画像ファイル・フォルダを使用する。旧 `dev/competition` は使わない。対象ファイルの存在確認・推論実行は研究室PCで行う。
