@@ -1,7 +1,7 @@
 """Detect one card per original image, export YOLO labels and visual previews.
 
 Run: uv run python scripts/auto_annotate.py
-     uv run python scripts/auto_annotate.py --output data/annotations/green20_h01_s01_outer_review
+     uv run python scripts/auto_annotate.py --output data/annotations/green20/green20_h01_s01_outer_review
      uv run python scripts/auto_annotate.py --session s02
 Images stay unchanged. Green border is ESTIMATED by expanding the white face.
 Inspect previews before using any labels for training.
@@ -111,7 +111,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=None,
                         help="Default: data/raw/green20/{split}/single/top/{height}_{session}")
     parser.add_argument("--output", type=Path, default=None,
-                        help="Default: data/annotations/green20_{height}_{session}")
+                        help="Default: data/annotations/green20/green20_{height}_{session}")
     args = parser.parse_args()
     if not (0 <= args.border_width <= 0.30 and 0 <= args.border_height <= 0.30):
         parser.error("Expansion fractions must be between 0 and 0.30")
@@ -124,7 +124,7 @@ def main() -> None:
                  ROOT / "data/raw/green20" / split / "single" / "top" /
                  f"{args.height}_{args.session}").resolve()
     output_dir = (args.output if args.output is not None else
-                  ROOT / "data/annotations" / f"green20_{args.height}_{args.session}").resolve()
+                  ROOT / "data/annotations/green20" / f"green20_{args.height}_{args.session}").resolve()
     if not input_dir.is_dir():
         parser.error(f"Input folder not found: {input_dir}")
     labels_dir = output_dir / "labels"
