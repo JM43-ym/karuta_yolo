@@ -230,8 +230,8 @@ def choose_near_front(indices, scores, progress, geometry, wanted: int, front_pr
     front = None
     for k in ranked:
         lo, hi = float(progress[k])-radius, float(progress[k])+radius
-        if sum(start <= j < k and progress[j] >= lo for j in range(k)) >= 2 and \\
-           sum(k < j < stop and progress[j] <= hi for j in range(k+1, stop)) >= 2:
+        if (sum(start <= j < k and progress[j] >= lo for j in range(k)) >= 2
+                and sum(k < j < stop and progress[j] <= hi for j in range(k+1, stop)) >= 2):
             front = k
             break
     if front is None:
