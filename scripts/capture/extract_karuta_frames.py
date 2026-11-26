@@ -65,14 +65,63 @@ def describe(img: np.ndarray):
     return descriptor, focus
 
 
-def scan_video(path: Path, sample_every: int):
+def frontal_geometry_score(img: np.ndarray, direction: str) -> float:
+    """Approximate frontality from the bright card face, not camera angle.
+
+    Scores quadrilateral regularity, opposite-edge symmetry, and known card
+    aspect ratio. Failure to find a card returns NaN; no physical angle claim.
+    """
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, mask = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    candidates = []
+    for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:8]:
+        area = cv2.contourArea(contour)
+        if not .005 < area / (h * w) < .8:
+            continue
+        perimeter = cv2.arcLength(contour, True)
+        poly = cv2.approxPolyDP(cv2.convexHull(contour), .025 * perimeter, True)
+        if len(poly) != 4 or not cv2.isContourConvex(poly):
+            continue
+        pts = poly[:, 0, :].astype(np.float64)
+        center = pts.mean(axis=0)
+        pts = pts[np.argsort(np.arctan2(pts[:, 1]-center[1], pts[:, 0]-center[0]))]
+        edges = np.roll(pts, -1, axis=0) - pts
+        lengths = np.linalg.norm(edges, axis=1)
+        if lengths.min() < 8:
+            continue
+        corners = []
+        for i in range(4):
+            a, b = -edges[i-1], edges[i]
+            corners.append(abs(float(np.dot(a, b) / (lengths[i-1]*lengths[i]))))
+        orth = float(np.mean(corners))
+        opposite = abs(float(np.log(lengths[0]/lengths[2]))) + abs(float(np.log(lengths[1]/lengths[3])))
+        # White inner face has a small border difference from 52x73 card.
+        observed = (lengths[0]+lengths[2])/(lengths[1]+lengths[3])
+        nominal = 52. / 73. if direction == "LR" else 73. / 52.
+        aspect = min(abs(float(np.log(observed/nominal))),
+                     abs(float(np.log(observed*nominal))))
+        # Perspective distortion should be small near frontal view.
+        penalty = 1.8*orth + 1.4*opposite + .75*aspect
+        candidates.append((area, -penalty))
+    if not candidates:
+        return float("nan")
+    # Prefer the largest plausible bright quadrilateral (usually the card).
+    return max(candidates)[1]
+
+
+def scan_video(path: Path, sample_every: int, direction: str | None = None):
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         raise ValueError(f"Unable to open AVI: {path}")
     fps = float(cap.get(cv2.CAP_PROP_FPS))
     if not math.isfinite(fps) or fps <= 0:
         fps = 15.0
-    descriptors, scores, indices = [], [], []
+    descriptors, scores, indices, geometry = [], [], [], []
     n = 0
     try:
         while True:
@@ -84,11 +133,13 @@ def scan_video(path: Path, sample_every: int):
                 descriptors.append(desc)
                 scores.append(focus)
                 indices.append(n)
+                if direction is not None:
+                    geometry.append(frontal_geometry_score(img, direction))
             n += 1
     finally:
         cap.release()
     if not indices:
-        return np.array([], dtype=int), np.array([], dtype=float), np.array([], dtype=float), fps
+        return np.array([], dtype=int), np.array([], dtype=float), np.array([], dtype=float), fps, np.array([])
 
     # Mean grayscale differences give an approximate traversal of the visual
     # sweep. Median filtering damps compression/noise and small hand jitters.
@@ -108,7 +159,7 @@ def scan_video(path: Path, sample_every: int):
         progress /= progress[-1]
     else:
         progress = np.linspace(0., 1., len(indices))
-    return np.array(indices, dtype=int), np.array(scores), progress, fps
+    return np.array(indices, dtype=int), np.array(scores), progress, fps, np.array(geometry, dtype=float)
 
 
 def choose(indices, scores, progress, wanted: int, trim: float):
@@ -145,37 +196,65 @@ def choose(indices, scores, progress, wanted: int, trim: float):
     return sorted(selected, key=lambda k: int(indices[k]))
 
 
-def choose_near_front(indices, scores, progress, wanted: int, front_progress: float,
+def choose_near_front(indices, scores, progress, geometry, wanted: int, front_progress: float,
                       sweep_half_angle: float, max_angle: float, trim: float):
-    """Choose sharp diverse frames in a *nominal* front-facing window.
+    """Find a front-like frame, then select two frames before and after it.
 
-    Assumes cumulative visual progress is monotonic and linear with angle.
-    This is NOT calibrated physical angle; review every extracted image.
+    Returned indices are chronological. The third frame is the geometry-based
+    front candidate, NOT a calibrated 0-degree measurement.
     """
     if not len(indices):
         return []
-    lower = max(0.0, front_progress - max_angle / (2.0 * sweep_half_angle))
-    upper = min(1.0, front_progress + max_angle / (2.0 * sweep_half_angle))
+    # front_progress is a hint, not the final reference point. The geometric
+    # optimum can be earlier/later when the camera sweep speed is uneven.
+    search_radius = .30
+    search_lower = max(0., front_progress-search_radius)
+    search_upper = min(1., front_progress+search_radius)
     start = int(len(indices) * trim)
     stop = max(start + 1, len(indices) - int(len(indices) * trim))
     candidates = [int(k) for k in range(start, stop)
-                  if lower <= float(progress[k]) <= upper]
+                  if search_lower <= float(progress[k]) <= search_upper and np.isfinite(geometry[k])]
     if len(candidates) < wanted:
-        raise ValueError(f"Only {len(candidates)} candidate frames in estimated front window; "
-                         f"need {wanted}. Check front-progress, sweep angle, or sampling.")
-    targets = np.linspace(lower, upper, wanted + 2)[1:-1]
-    remaining = set(candidates)
-    selected = []
-    sharp_scale = max(float(np.quantile(scores[candidates], .90)), 1.0)
-    span = max((upper - lower) / max(wanted, 1), .005)
-    for target in targets:
-        ranked = sorted(remaining, key=lambda k: abs(float(progress[k]) - target))
-        near = ranked[:max(5, math.ceil(len(candidates) / wanted * 1.5))]
-        chosen = max(near, key=lambda k: (.60 * min(float(scores[k]) / sharp_scale, 2.0)
-                                            - .95 * abs(float(progress[k]) - target) / span))
-        selected.append(chosen)
-        remaining.remove(chosen)
-    return sorted(selected, key=lambda k: int(indices[k]))
+        raise ValueError(f"Only {len(candidates)} usable card geometries; check the video.")
+    # Robustly favor frontality, then crispness; restrict center selection to
+    # candidates with space to its left/right in the nominal +/- max-angle window.
+    radius = max_angle/(2.0*sweep_half_angle)
+    sharp_scale = max(float(np.quantile(scores[candidates], .90)), 1.)
+    geom = np.array([geometry[k] for k in candidates])
+    low, high = float(np.quantile(geom, .10)), float(np.quantile(geom, .90))
+    denom = max(high-low, .01)
+    ranked = sorted(candidates, key=lambda k:
+                    ((float(geometry[k])-low)/denom
+                     + .12*min(float(scores[k])/sharp_scale, 2.0)
+                     - .12*abs(float(progress[k])-front_progress)), reverse=True)
+    front = None
+    for k in ranked:
+        lo, hi = float(progress[k])-radius, float(progress[k])+radius
+        if sum(start <= j < k and progress[j] >= lo for j in range(k)) >= 2 and \\
+           sum(k < j < stop and progress[j] <= hi for j in range(k+1, stop)) >= 2:
+            front = k
+            break
+    if front is None:
+        raise ValueError("No frontal candidate with two frames on each side")
+    center = float(progress[front])
+    left = [j for j in range(start, front) if center-radius <= progress[j] < center]
+    right = [j for j in range(front+1, stop) if center < progress[j] <= center+radius]
+    if len(left) < 2 or len(right) < 2:
+        raise ValueError("Insufficient frames around inferred frontal center")
+    # Split each half of the nominal angular interval into two evenly spaced
+    # targets. Each chosen frame must be chronological and distinct.
+    def pick_two(pool, targets):
+        chosen = []
+        remaining = set(pool)
+        for target in targets:
+            best = min(remaining, key=lambda j: (
+                abs(float(progress[j])-target) - .015*min(float(scores[j])/sharp_scale, 2.)))
+            chosen.append(best)
+            remaining.remove(best)
+        return sorted(chosen)
+    before = pick_two(left, [center-radius*.75, center-radius*.35])
+    after = pick_two(right, [center+radius*.35, center+radius*.75])
+    return before+[front]+after
 
 
 def read_selected(path: Path, indices: list[int]):
@@ -269,10 +348,13 @@ def main():
         if existing and not args.replace:
             print(f"SKIP {video.name}: {len(existing)} extracted frames exist (use --replace deliberately)")
             continue
-        idx, focus, progress, fps = scan_video(video, args.sample_every)
+        idx, focus, progress, fps, geometry = scan_video(video, args.sample_every,
+            direction if args.selection == "near-front" else None)
         if args.selection == "near-front":
             try:
-                picks = choose_near_front(idx, focus, progress, args.per_video,
+                if args.per_video != 5:
+                    ap.error("near-front geometry selection currently requires --per-video 5")
+                picks = choose_near_front(idx, focus, progress, geometry, args.per_video,
                                           args.front_progress, args.sweep_half_angle,
                                           args.max_angle, args.edge_fraction)
             except ValueError as exc:
@@ -310,12 +392,11 @@ def main():
                 "card_id":card["card_id"],"direction":direction,
                 "frame_index":int(idx[k]),"frame_time_seconds":f"{idx[k]/fps:.3f}",
                 "sharpness":f"{focus[k]:.2f}","motion_progress":f"{progress[k]:.4f}",
-                "selection_method":("estimated_near_front_and_sharpness" if args.selection == "near-front"
+                "selection_method":("geometry_centered_near_front" if args.selection == "near-front"
                                     else "visual_change_and_sharpness"),
                 "selected_position":position,
-                "note":(f"ESTIMATED only: within +/-{args.max_angle:g} degrees "
-                        f"if sweep +/-{args.sweep_half_angle:g} degrees and motion progress "
-                        f"is linear; REVIEW actual viewpoint" if args.selection == "near-front"
+                "note":(f"Position 3 = geometrically estimated front, NOT measured 0 degrees; "
+                        f"window +/-{args.max_angle:g} is approximate; REVIEW manually" if args.selection == "near-front"
                         else "REVIEW viewpoint, blur, card completeness, and labels"),
             })
         print(f"{video.name}: frames={len(idx)} selected={selected} progress="
