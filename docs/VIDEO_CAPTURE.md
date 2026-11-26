@@ -220,3 +220,19 @@ uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20
 
 出力先: `data/raw/green20/train/single/oblique/extracted/h01_s01/LR/near_front_15/` と `FB/near_front_15/`。
 既存の `near_front_15` アノテーションがある場合、**画像の選び直しにより以前のラベルは無効**。再アノテーション・目視レビューを行うまでデータセット生成しない。コンソールの `WARNING` の動画は5枚選べなかったものなので、旧画像があればそれはそのまま残る。フォルダ全体の結果に混在がないか確認する。
+
+
+## 抽出結果のHTML比較（2026-11-26）
+
+抽出スクリプトは `extraction_report.csv` と同じフォルダへ `extraction_gallery.html` を自動生成する。各札の5枚を**画像変化進行度に対応した撮影順**で並べ、3枚目を**推定正面**として枠で強調する。実角度が0°という意味ではない。
+
+```powershell
+# 正面付近を再抽出して、画像とHTMLを更新
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR --selection near-front --per-video 5 --sweep-half-angle 45 --max-angle 15 --replace
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction FB --selection near-front --per-video 5 --sweep-half-angle 45 --max-angle 15 --replace
+# HTML確認
+start data/raw/green20/train/single/oblique/extracted/h01_s01/LR/near_front_15/extraction_gallery.html
+start data/raw/green20/train/single/oblique/extracted/h01_s01/FB/near_front_15/extraction_gallery.html
+```
+
+フレーム選びは秒数の均等分割ではなく、動画内の画像変化量の累積比（0～1）を使用する。動画ごとに撮影時間・移動速度が違っても比較的安定するが、移動の角度と画像変化量が正比例するとは限らない。正面候補は四隅の形状などから推定し、その前後を変化進行度で分配する。5枚揃わない動画は警告表示。抽出後はHTMLで全札を確認すること。
