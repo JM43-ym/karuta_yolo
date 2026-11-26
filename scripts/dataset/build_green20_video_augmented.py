@@ -23,8 +23,8 @@ from dataset.generate_rotations import ROOT, load_image, save_png, get_corners, 
 from annotation.annotate_green20_val_angles import ANGLES, SOURCE as FIXED_SOURCE, OUTPUT as FIXED_ANN
 
 RAW=ROOT/"data/raw/green20"
-ANN=ROOT/"data/annotations"
-VIDEO=ANN/"video_frames/green20/h01_s01"
+ANN=ROOT/"data/annotations/green20"
+VIDEO=ROOT/"data/annotations/video_frames/green20/h01_s01"
 OUT=ROOT/"data/datasets/green20_video_augmented"
 EXT={".png",".jpg",".jpeg"}
 
