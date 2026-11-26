@@ -192,7 +192,8 @@ def main():
     ap.add_argument("--confirm-independent-val",action="store_true",
                     help="I verified s02 top and multi-card Val photos independent of all Train captures")
     ap.add_argument("--output",type=Path,default=OUT)
-    ap.add_argument("--val-height",choices=("h01","h03"),default="h03",\n                    help="Independent s02 top-view Val session (default h03_s02)")
+    ap.add_argument("--val-height",choices=("h01","h03"),default="h03",
+                    help="Independent s02 top-view Val session (default h03_s02)")
     ap.add_argument("--frame-set",choices=("near_front_15",),default="near_front_15",
                     help="Which extracted frame collection and matching annotations to use")
     args=ap.parse_args()
