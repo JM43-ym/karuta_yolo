@@ -22,7 +22,7 @@ from pathlib import Path
 from dataset.generate_rotations import ROOT, load_image, read_report, get_corners, xywh_from_corners, save_png, write_label
 
 RAW = ROOT / "data/raw/green20"
-ANN = ROOT / "data/annotations"
+ANN = ROOT / "data/annotations/green20"
 V2 = ROOT / "data/datasets/green20_v2"
 V3 = ROOT / "data/datasets/green20_v3"
 
