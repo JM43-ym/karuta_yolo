@@ -190,6 +190,9 @@ class App:
         self.matrix_window = canvas.create_window((0, 0), window=self.matrix_frame, anchor="nw")
         self.matrix_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         self.matrix_canvas = canvas
+        self.pair_hint_var = tk.StringVar(value="セルを選ぶと、正解札と予測札の決まり字を表示します。")
+        ttk.Label(right, textvariable=self.pair_hint_var, font=("Yu Gothic UI", 11, "bold"),
+                  foreground="#20394f", padding=(8, 7)).pack(side="bottom", anchor="w")
 
         def head(row, col, value, width=7):
             lab = tk.Label(self.matrix_frame, text=value, bg="#e5f0fa", fg=DARK,
@@ -217,6 +220,8 @@ class App:
                 if i != j:
                     b.bind("<Button-1>", lambda e, r=i, c=j: self.click_matrix(r, c, -1 if e.state & 0x1 else 1))
                     b.bind("<Button-3>", lambda e, r=i, c=j: self.click_matrix(r, c, -1))
+                    b.bind("<Enter>", lambda e, r=i, c=j: self.show_pair(r, c))
+                    b.bind("<Leave>", lambda e: self.clear_pair())
                 buttons.append(b)
             self.matrix_buttons.append(buttons)
             self.actual_count_labels.append(head(i+1, 21, "0", 9))
@@ -290,6 +295,16 @@ class App:
         item["missing"][row][col] = max(0, item["missing"][row][col]+delta)
         self.persist()
         self.refresh()
+
+    def show_pair(self, actual, predicted):
+        true_id, true_prefix = self.cards[actual]
+        pred_id, pred_prefix = self.cards[predicted]
+        self.pair_hint_var.set(
+            f"正解：{true_id}（{true_prefix}）  →  予測：{pred_id}（{pred_prefix}）"
+        )
+
+    def clear_pair(self):
+        self.pair_hint_var.set("セルを選ぶと、正解札と予測札の決まり字を表示します。")
 
     def click_matrix(self, actual, predicted, delta):
         if self.selected == N_IMAGES or actual == predicted:
