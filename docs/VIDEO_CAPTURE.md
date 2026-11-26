@@ -64,7 +64,7 @@ uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20
 `--sweep-half-angle` は撮影した動画の**片側の最大角度**（度）であり、60は例示値であって実測値ではない。実際の撮影範囲に合わせて指定する。正面が進行度0.5以外の場合は `--front-progress` を変更できるが、基準は動画を目視して決める。撮影速度・照明変化・往復運動によってズレる可能性がある。
 
 旧方式の抽出画像は各 `LR/front_45/`・`FB/front_45/` に整理する。新しい正面付近の画像は各 `near_front_15/` サブフォルダへ保存する。元動画は変更しない。
-新しい画像は**改めてアノテーションする必要がある**。`--frame-set near_front_15` を指定すると、アノテーションは `data/annotations/video_frames/<color>/h01_s01/near_front_15/LR_annotated/`（FBも同様）へ分けて保存する。旧画像 (`front_45`) の既存アノテーションは従来の `LR_annotated/` と `FB_annotated/` に残す。新データセット生成時は `--frame-set near_front_15 --output data/datasets/green20_near_front_15` を指定し、旧データセットに上書きしない。生成前に全件の確認と独立Val確認が必要。
+新しい画像は**改めてアノテーションする必要がある**。`--frame-set near_front_15` を指定すると、アノテーションは `data/annotations/video_frames/<color>/h01_s01/near_front_15/LR_annotated/`（FBも同様）へ分けて保存する。旧画像 (`front_45`) の既存アノテーションは `data/annotations/video_frames/<color>/h01_s01/front_45/LR_annotated/` と `FB_annotated/` に整理して保持する。新データセット生成時は `--frame-set near_front_15 --output data/datasets/green20_near_front_15` を指定し、旧データセットに上書きしない。生成前に全件の確認と独立Val確認が必要。
 
 ### ③ 自動アノテーション
 
@@ -196,7 +196,7 @@ uv run --no-sync python scripts/dataset/build_green20_video_augmented.py --build
 
 旧画像ファイルを `data/raw/<color>/train/single/oblique/extracted/h01_s01/LR/front_45/` と `FB/front_45/` に移す。既存の `extraction_report.csv` は各方向の `front_45/` へ移す（残っている場合）。
 
-この変更に合わせて `annotate_karuta_frames.py`、`manual_fix_karuta_frames.py`、`review_karuta_annotations.py` は `--frame-set front_45` が既定。旧アノテーションは移動しない。新規 `near_front_15` はそれぞれ `--frame-set near_front_15` を付ける。
+この変更に合わせて `annotate_karuta_frames.py`、`manual_fix_karuta_frames.py`、`review_karuta_annotations.py` は `--frame-set front_45` が既定。旧アノテーションも `front_45/` の中に移動済み。新規 `near_front_15` はそれぞれ `--frame-set near_front_15` を付ける。
 
 ```powershell
 uv run --no-sync python scripts/annotation/annotate_karuta_frames.py --color green20 --direction LR --frame-set near_front_15
@@ -236,3 +236,8 @@ start data/raw/green20/train/single/oblique/extracted/h01_s01/FB/near_front_15/e
 ```
 
 フレーム選びは秒数の均等分割ではなく、動画内の画像変化量の累積比（0～1）を使用する。動画ごとに撮影時間・移動速度が違っても比較的安定するが、移動の角度と画像変化量が正比例するとは限らない。正面候補は四隅の形状などから推定し、その前後を変化進行度で分配する。5枚揃わない動画は警告表示。抽出後はHTMLで全札を確認すること。
+
+
+## 2026-11-26 旧アノテーション front_45 への移動
+
+ユーザーが旧 `LR_annotated/`・`FB_annotated/` を `data/annotations/video_frames/green20/h01_s01/front_45/` に整理したため、`annotate_karuta_frames.py`、`manual_fix_karuta_frames.py`、`review_karuta_annotations.py`、`build_green20_video_augmented.py` のアノテーション参照先を `frame_set` 配下に統一した。`near_front_15` は従来通り独立した出力先で保持する。
