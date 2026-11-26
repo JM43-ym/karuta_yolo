@@ -31,7 +31,7 @@ uv run python scripts/annotation/auto_annotate.py --session s01
 uv run python scripts/annotation/auto_annotate.py --session s02
 ```
 
-アノテーションはそれぞれ `data/annotations/green20_h01_s01/` と `green20_h01_s02/` に別保存されます。生成ラベルは学習前に必ず目視確認してください。
+アノテーションはそれぞれ `data/annotations/green20/green20_h01_s01/` と `data/annotations/green20/green20_h01_s02/` に別保存されます。生成ラベルは学習前に必ず目視確認してください。
 
 新しいテスト配置は `data/raw/green20/test/multi/competition/touching/` と `spaced/`。推論時は `--source` で明示指定します。詳しくは [11月26日の計画](docs/TEST_SPACING_AND_FRONT_VIEW_PLAN.md) および [data/README.md](data/README.md) を参照してください。同一写真を回転生成して学習・評価の両方へ混ぜないようにしてください。
 
