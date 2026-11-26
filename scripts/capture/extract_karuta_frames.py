@@ -26,6 +26,7 @@ if str(_SCRIPTS_DIR) not in _sys.path:
 
 import argparse
 import csv
+import html
 import math
 import re
 from pathlib import Path
@@ -280,6 +281,64 @@ def read_selected(path: Path, indices: list[int]):
     return frames
 
 
+def write_extraction_gallery(dest: Path, report: Path, mapping: list[dict],
+                             direction: str, session: str):
+    """Write a five-column, source-PNG extraction review (no labels needed)."""
+    if not report.is_file():
+        return
+    with report.open(encoding="utf-8-sig", newline="") as fp:
+        records = list(csv.DictReader(fp))
+    rows = []
+    missing = []
+    for card in mapping:
+        cid = int(card["card_id"])
+        matching = [r for r in records
+                    if r.get("card_id", "").strip().lstrip("0") == str(cid)
+                    and r.get("direction") == direction
+                    and r.get("image", "").startswith(f"card_{cid:03d}_{direction}_h01_{session}_")
+                    and (dest / r["image"]).is_file()]
+        matching.sort(key=lambda r: int(r.get("frame_index", 0)))
+        if len(matching) != 5:
+            missing.append(f'{card["group_id"]}: {len(matching)} frames')
+        cards_html = []
+        for pos, item in enumerate(matching, 1):
+            name = item["image"]
+            safe = html.escape(name, quote=True)
+            estimated = pos == 3 and len(matching) == 5
+            label = "3 / 推定正面" if estimated else f"{pos} / 5"
+            cards_html.append(
+                f'<article class="{"center" if estimated else ""}">'
+                f'<a href="{safe}"><img loading="lazy" src="{safe}" alt="{safe}"></a>'
+                f'<b>{label}</b><small>frame {html.escape(str(item.get("frame_index","")))}</small>'
+                f'<small>変化進行度 {html.escape(str(item.get("motion_progress","")))}</small>'
+                f'</article>')
+        title = html.escape(f'{card["group_id"]} / {cid:03d} / {card.get("decision_prefix", "")}')
+        rows.append(f'<section><h2>{title}</h2><div class="grid">{"".join(cards_html)}</div></section>')
+    header = html.escape(f"{direction} / {dest.name}")
+    problem = html.escape(", ".join(missing) if missing else "全20札で5枚を確認")
+    page = '''<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<title>Karuta extraction review</title><style>
+body{font-family:system-ui,"Yu Gothic",sans-serif;background:#f5f6f8;color:#17212b;margin:22px}
+section{background:#fff;border:1px solid #dce1e6;border-radius:12px;margin:20px 0;padding:14px}
+h2{font-size:18px;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+article{padding:7px;border:1px solid #d3d9df;border-radius:9px;min-width:0;background:#fafbfc}
+article.center{border:3px solid #24936c;background:#eaf8f0}
+img{width:100%;height:160px;object-fit:contain;background:#e3e6e9}
+small{display:block;font-size:11px;overflow-wrap:anywhere;margin-top:4px}
+b{display:block;margin-top:5px}p{line-height:1.6}
+@media(max-width:760px){.grid{grid-template-columns:repeat(5,minmax(130px,1fr));overflow-x:auto}}
+</style></head><body>'''
+    page += f'<h1>動画フレーム抽出確認：{header}</h1>'
+    page += '<p>各札の5枚を撮影順に表示。3枚目は形状から推定した正面候補です。<br>実角度0°や±15°を保証するものではありません。画像をクリックすると元PNGを開きます。</p>'
+    page += f'<p><b>枚数確認：</b>{problem}</p>'
+    page += ''.join(rows) + '</body></html>'
+    target = dest / "extraction_gallery.html"
+    target.write_text(page, encoding="utf-8")
+    print(f"Extraction HTML: {target}")
+    if missing:
+        print(f"WARNING: missing/incomplete groups: {problem}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--color", choices=COLORS, required=True)
@@ -411,6 +470,7 @@ def main():
         print(f"Saved {len(appended)} frames. Report: {report}")
     else:
         print("No new frames saved.")
+    write_extraction_gallery(dest, report, mapping, args.direction, args.session)
     print("Selection is speed-adaptive, NOT calibrated to physical degrees. Check every image.")
 
 
