@@ -13,7 +13,9 @@ from __future__ import annotations
 import csv
 import json
 import os
+import shutil
 import tempfile
+from datetime import datetime
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -107,6 +109,7 @@ class App:
         self.root = root
         self.cards = load_cards()
         self.path = DEFAULT_DATA
+        self.backed_up_paths = set()
         self.data = new_data()
         if self.path.exists():
             with self.path.open(encoding="utf-8") as f:
@@ -148,7 +151,7 @@ class App:
         self.name_entry.bind("<Return>", self.rename)
         ttk.Button(header, text="名前を保存", command=self.rename).pack(side="left", padx=3)
         ttk.Button(header, text="CSV出力", command=self.export).pack(side="right", padx=3)
-        ttk.Button(header, text="データを開く", command=self.open_data).pack(side="right", padx=3)
+        ttk.Button(header, text="既存データを開いて追記", command=self.open_data).pack(side="right", padx=3)
         ttk.Button(header, text="別名保存", command=self.save_as).pack(side="right", padx=3)
 
         ttk.Label(
@@ -287,9 +290,23 @@ class App:
     def current(self):
         return self.aggregate() if self.selected == N_IMAGES else self.data["images"][self.selected]
 
+    def backup_existing(self):
+        """Save an unchanged copy once before the first edit of an opened file."""
+        key = str(self.path.resolve())
+        if key in self.backed_up_paths:
+            return
+        if self.path.exists():
+            backup_dir = self.path.parent / "backups"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            dest = backup_dir / f"{self.path.stem}_before_edit_{stamp}{self.path.suffix}"
+            shutil.copy2(self.path, dest)
+        self.backed_up_paths.add(key)
+
     def persist(self):
+        self.backup_existing()
         atomic_save(self.path, self.data)
-        self.status_var.set(f"自動保存済み：{self.path}")
+        self.status_var.set(f"追記を自動保存しました：{self.path}")
 
     def select_image(self, event=None):
         ix = self.view.current()
@@ -485,14 +502,10 @@ class App:
         self.path = Path(filename)
         self.selected = 0
         self.refresh()
-        self.status_var.set(f"読み込みました：{filename}")
+        self.status_var.set(f"既存データを読み込みました。追記できます：{filename}")
 
     def close(self):
-        try:
-            self.persist()
-        except OSError as exc:
-            messagebox.showerror("保存失敗", f"データ保存に失敗しました。\n{exc}")
-            return
+        # Edits are already saved immediately; do not overwrite a just-opened file on exit.
         self.root.destroy()
 
 
