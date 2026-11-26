@@ -2,7 +2,7 @@
 
 Inputs: data/raw/green20/val/multi/{two_cards,three_cards}/{two,three}_N.png
 Mapping: data/metadata/green20_val_layouts.csv
-Outputs: data/annotations/green20_h03_multi_val/{labels,previews,report.csv}
+Outputs: data/annotations/green20/green20_h03_multi_val/{labels,previews,report.csv}
 
 Run: uv run python scripts/annotate_multi_val.py
 Every output is provisional (REVIEW); inspect *all* previews before use.
@@ -28,7 +28,7 @@ from annotation.auto_annotate import candidate_rects, make_annotation, read_imag
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = ROOT / "data/metadata/green20_val_layouts.csv"
 SOURCE = ROOT / "data/raw/green20/val/multi"
-OUTPUT = ROOT / "data/annotations/green20_h03_multi_val"
+OUTPUT = ROOT / "data/annotations/green20/green20_h03_multi_val"
 
 
 def overlap(a: np.ndarray, b: np.ndarray) -> float:
