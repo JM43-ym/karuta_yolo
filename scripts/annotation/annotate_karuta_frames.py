@@ -202,13 +202,16 @@ def main():
     ap.add_argument("--color",choices=COLORS,required=True)
     ap.add_argument("--direction",choices=("LR","FB"),required=True)
     ap.add_argument("--session",default="s01")
+    ap.add_argument("--frame-set", choices=("front_45","near_front_15"), default="front_45")
     args=ap.parse_args()
     if not re.fullmatch(r"s\d+",args.session):
         ap.error("Invalid session")
     with (ROOT/"data/metadata"/f"{args.color}_cards.csv").open(encoding="utf-8-sig",newline="") as f:
         lookup={int(r["card_id"]):r["group_id"] for r in csv.DictReader(f)}
-    src=ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction
+    src=ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction/args.frame_set
     base=ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"
+    if args.frame_set != "front_45":
+        base=base/args.frame_set
     out=base/f"{args.direction}_annotated"
     legacy=base/f"{args.direction}_v3"
     if legacy.exists() and not out.exists():
