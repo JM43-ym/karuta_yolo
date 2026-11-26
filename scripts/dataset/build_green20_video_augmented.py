@@ -102,7 +102,7 @@ def video_sources(mapping, frame_set="front_45"):
     all_items=[]
     for direction in ("LR","FB"):
         folder=RAW/"train/single/oblique/extracted/h01_s01"/direction/frame_set
-        ann_base = VIDEO if frame_set == "front_45" else VIDEO/frame_set
+        ann_base = VIDEO/frame_set
         labels=ann_base/f"{direction}_annotated"/"labels"
         images=image_files(folder)
         if len(images)!=100:
