@@ -98,11 +98,12 @@ def scale_by_area(top):
     return float(np.median(measurements))
 
 
-def video_sources(mapping):
+def video_sources(mapping, frame_set="front_45"):
     all_items=[]
     for direction in ("LR","FB"):
-        folder=RAW/"train/single/oblique/extracted/h01_s01"/direction/"front_45"
-        labels=VIDEO/f"{direction}_annotated"/"labels"
+        folder=RAW/"train/single/oblique/extracted/h01_s01"/direction/frame_set
+        ann_base = VIDEO if frame_set == "front_45" else VIDEO/frame_set
+        labels=ann_base/f"{direction}_annotated"/"labels"
         images=image_files(folder)
         if len(images)!=100:
             raise ValueError(f"Expected 100 {direction} video images, got {len(images)}: {folder}")
@@ -179,6 +180,8 @@ def main():
     ap.add_argument("--confirm-independent-val",action="store_true",
                     help="I verified fixed-angle and s02 images are independent of training captures")
     ap.add_argument("--output",type=Path,default=OUT)
+    ap.add_argument("--frame-set",choices=("front_45","near_front_15"),default="front_45",
+                    help="Which extracted frame collection and matching annotations to use")
     args=ap.parse_args()
     mapping,names=map_green()
     tops={h:top_sources(h,"s01",mapping) for h in ("h01","h02","h03")}
@@ -188,7 +191,7 @@ def main():
         raise ValueError(f"Implausible measured scales: {scales}")
     print("Measured relative card sizes, normalized by image area:",sizes)
     print(f"Three train scales: h01=1, h02={scales[1]:.5f}, h03={scales[2]:.5f}")
-    video=video_sources(mapping)
+    video=video_sources(mapping,args.frame_set)
     fixed=fixed_val(mapping)
     front=RAW/"val/single/top/h01_s02"
     val_height="h01" if front.is_dir() else "h03"
@@ -202,6 +205,8 @@ def main():
         return
     if not args.confirm_independent_val:
         ap.error("--build requires --confirm-independent-val (verify photo-session independence)")
+    if args.frame_set != "front_45" and args.output == OUT:
+        ap.error("Near-front dataset requires a separate --output path (do not reuse legacy dataset)")
     dest=(args.output if args.output.is_absolute() else ROOT/args.output).resolve()
     if dest.exists():
         ap.error(f"Output already exists; no overwrite allowed: {dest}")
