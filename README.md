@@ -18,7 +18,7 @@ data/raw/green20/top/
 └── h01_s02/   # 撮影2回目（評価用候補）
 ```
 
-**s01 の撮影・リネームは完了済み。** s02 撮影後の手順は以下です。
+**2026-11-26の方針：旧h01をs03として保存し、新しいh01をs01に撮影する。** 既存データを失わないようバックアップ後に整理し、s01の札番号・アノテーションを取り直してください。既存のs02評価用撮影は独立して維持します。手順の例：
 
 ```powershell
 # リネームの確認（変更なし）
@@ -33,7 +33,7 @@ uv run python scripts/annotation/auto_annotate.py --session s02
 
 アノテーションはそれぞれ `data/annotations/green20_h01_s01/` と `green20_h01_s02/` に別保存されます。生成ラベルは学習前に必ず目視確認してください。
 
-詳しくは [data/README.md](data/README.md) を参照してください。同一写真を回転生成して学習・評価の両方へ混ぜないようにしてください。
+新しいテスト配置は `data/raw/green20/test/multi/competition/touching/` と `spaced/`。推論時は `--source` で明示指定します。詳しくは [11月26日の計画](docs/TEST_SPACING_AND_FRONT_VIEW_PLAN.md) および [data/README.md](data/README.md) を参照してください。同一写真を回転生成して学習・評価の両方へ混ぜないようにしてください。
 
 ## 研究日記と実行時刻ログ
 
