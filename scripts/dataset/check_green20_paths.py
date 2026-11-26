@@ -32,7 +32,9 @@ def main():
     }
     optional={
         "legacy val singles h01":BASE/"val/single/top/h01_s02",
-        "dev competition":BASE/"dev/competition",
+        "old h01 capture (s03)":BASE/"train/single/top/h01_s03",
+        "test competition touching":BASE/"test/multi/competition/touching",
+        "test competition spaced":BASE/"test/multi/competition/spaced",
         "train oblique":BASE/"train/single/oblique",
         "train scattered":BASE/"train/multi/scattered",
         "val scattered":BASE/"val/multi/scattered",
