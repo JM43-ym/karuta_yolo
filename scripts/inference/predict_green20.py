@@ -1,7 +1,7 @@
 """YOLO inference with card number + kimariji on output image and CSV.
 
 Example:
- uv run python scripts/predict_green20.py --model runs/detect/runs/green20/trial_01/weights/best.pt --source data/raw/green20/dev/competition --imgsz 1280 --conf 0.25
+ uv run --no-sync python scripts/inference/predict_green20.py --model runs/green20/trial_video_aug_01/weights/best.pt --source data/raw/green20/test/multi/competition/touching --imgsz 1280 --conf 0.25
 
 Requires Pillow for Japanese image labels (usually included with Ultralytics).\nUse --labels-dir to write a separate *_gt.png with correct card IDs and prefixes.
 """
@@ -45,7 +45,7 @@ def select_font(size: int):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--model",type=Path,required=True)
-    parser.add_argument("--source",required=True,help="Image file or folder")
+    parser.add_argument("--source",required=True,help="Image file or folder (e.g. data/raw/green20/test/multi/competition/touching or spaced)")
     parser.add_argument("--output",type=Path,default=ROOT/"runs/green20_labeled")
     parser.add_argument("--imgsz",type=int,default=1280)
     parser.add_argument("--conf",type=float,default=0.25)
