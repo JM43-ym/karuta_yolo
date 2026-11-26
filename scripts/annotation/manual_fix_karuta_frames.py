@@ -37,6 +37,7 @@ def main():
     ap.add_argument("--color", required=True, choices=COLORS)
     ap.add_argument("--direction", required=True, choices=("LR", "FB"))
     ap.add_argument("--session", default="s01")
+    ap.add_argument("--frame-set", choices=("front_45","near_front_15"), default="front_45")
     ap.add_argument("--preview-width", type=int, default=1100)
     args = ap.parse_args()
     if not re.fullmatch(r"s\d+", args.session) or args.preview_width < 300:
@@ -45,8 +46,11 @@ def main():
     with (ROOT/"data/metadata"/f"{args.color}_cards.csv").open(
             encoding="utf-8-sig", newline="") as f:
         groups = {int(r["card_id"]): r["group_id"] for r in csv.DictReader(f)}
-    src = ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction
-    out = ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"/f"{args.direction}_annotated"
+    src = ROOT/"data/raw"/args.color/"train/single/oblique/extracted"/f"h01_{args.session}"/args.direction/args.frame_set
+    base = ROOT/"data/annotations/video_frames"/args.color/f"h01_{args.session}"
+    if args.frame_set != "front_45":
+        base = base/args.frame_set
+    out = base/f"{args.direction}_annotated"
     if not src.is_dir() or not out.is_dir():
         ap.error("Missing extracted images or annotation folder. Run annotate_karuta_frames.py first.")
     labels, previews, rectified = (out/"labels", out/"previews", out/"rectified")
