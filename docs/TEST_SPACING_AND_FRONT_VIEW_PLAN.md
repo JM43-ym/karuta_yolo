@@ -110,6 +110,6 @@ GitHubでは`auto_annotate.py`、`generate_rotations.py`、`build_green20_v3.py`
 uv run --no-sync python scripts/dataset/calculate_green20_scales.py
 ```
 
-新しいh01と既存のh02/h03の`s01`画像20枚、各`green20_h??_s01/report.csv`、各ラベルが必要。各画像のアノテーション四隅から`sqrt(札の四角形面積/画像面積)`を求め、高さごとに20枚の中央値を取る。h01=1としてh02/h03比を計算し、`reports/green20_scales_日時.csv`に書き出す。**元画像・ラベル・データセットを上書きしない**。倍率計算は新動画フレーム抽出やVal画像の完了を待つ必要がない。
+新しいh01と既存のh02/h03の`s01`画像20枚、各`green20_h??_s01/report.csv`、各ラベルが必要。各画像のアノテーション四隅から`sqrt(札の四角形面積/画像面積)`を求め、高さごとに20枚の中央値を取る。h01=1としてh02/h03比を計算し、`data/metadata/scales/green20_scales_日時.csv`に書き出す。**元画像・ラベル・データセットを上書きしない**。倍率計算は新動画フレーム抽出やVal画像の完了を待つ必要がない。
 
 この手順のPC上での動作結果は未確認。実行ログを見て倍率が妥当か確認すること。
