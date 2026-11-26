@@ -48,6 +48,24 @@ uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20
 `data/raw/<color>/train/single/oblique/extracted/h01_s01/LR/` と `FB/`。
 元動画は`data/raw/<color>/train/single/oblique/videos/h01_s01/`に保持し、既存の抽出画像は通常上書きしません。
 
+
+### 正面付近（約±15°）の抽出：2026-11-26追加
+
+従来の抽出は全視点から5枚を選ぶ。新しい `--selection near-front` は、動画の**画像変化量の累積進行度**から正面付近と推定する範囲を限定し、その中で鮮明な5枚を選ぶ。
+**動画から物理角度を測定しているわけではない**ため、±15°は撮影時の往復ではない一定方向のスイープ角度と、視覚進行度が角度に比例するという仮定のもとでの目安。撮影が片道で正面がほぼ中央にあることを確認する。
+
+撮影範囲が例えば「左60°から右60°」と**確認できている場合だけ**次を使用する（FBも同様）。
+
+```powershell
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction LR --per-video 5 --selection near-front --sweep-half-angle 60 --max-angle 15
+uv run --no-sync python scripts/capture/extract_karuta_frames.py --color green20 --direction FB --per-video 5 --selection near-front --sweep-half-angle 60 --max-angle 15
+```
+
+`--sweep-half-angle` は撮影した動画の**片側の最大角度**（度）であり、60は例示値であって実測値ではない。実際の撮影範囲に合わせて指定する。正面が進行度0.5以外の場合は `--front-progress` を変更できるが、基準は動画を目視して決める。撮影速度・照明変化・往復運動によってズレる可能性がある。
+
+新しい画像は従来の `LR/` と `FB/` の直下ではなく、各 `near_front_15/` サブフォルダへ保存する。従来の抽出PNG・ラベル・元動画は変更しない。
+新しい画像は**改めてアノテーションする必要がある**。既存のアノテーションスクリプトとデータセットビルダーはまだ `near_front_15/` を参照しないので、既存のラベルを流用したり、そのまま学習に入れたりしないこと。
+
 ### ③ 自動アノテーション
 
 ```powershell
