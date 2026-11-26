@@ -145,6 +145,39 @@ def choose(indices, scores, progress, wanted: int, trim: float):
     return sorted(selected, key=lambda k: int(indices[k]))
 
 
+def choose_near_front(indices, scores, progress, wanted: int, front_progress: float,
+                      sweep_half_angle: float, max_angle: float, trim: float):
+    """Choose sharp diverse frames in a *nominal* front-facing window.
+
+    Assumes cumulative visual progress is monotonic and linear with angle.
+    This is NOT calibrated physical angle; review every extracted image.
+    """
+    if not len(indices):
+        return []
+    lower = max(0.0, front_progress - max_angle / (2.0 * sweep_half_angle))
+    upper = min(1.0, front_progress + max_angle / (2.0 * sweep_half_angle))
+    start = int(len(indices) * trim)
+    stop = max(start + 1, len(indices) - int(len(indices) * trim))
+    candidates = [int(k) for k in range(start, stop)
+                  if lower <= float(progress[k]) <= upper]
+    if len(candidates) < wanted:
+        raise ValueError(f"Only {len(candidates)} candidate frames in estimated front window; "
+                         f"need {wanted}. Check front-progress, sweep angle, or sampling.")
+    targets = np.linspace(lower, upper, wanted + 2)[1:-1]
+    remaining = set(candidates)
+    selected = []
+    sharp_scale = max(float(np.quantile(scores[candidates], .90)), 1.0)
+    span = max((upper - lower) / max(wanted, 1), .005)
+    for target in targets:
+        ranked = sorted(remaining, key=lambda k: abs(float(progress[k]) - target))
+        near = ranked[:max(5, math.ceil(len(candidates) / wanted * 1.5))]
+        chosen = max(near, key=lambda k: (.60 * min(float(scores[k]) / sharp_scale, 2.0)
+                                            - .95 * abs(float(progress[k]) - target) / span))
+        selected.append(chosen)
+        remaining.remove(chosen)
+    return sorted(selected, key=lambda k: int(indices[k]))
+
+
 def read_selected(path: Path, indices: list[int]):
     wanted = set(indices)
     cap = cv2.VideoCapture(str(path))
@@ -177,16 +210,38 @@ def main():
     ap.add_argument("--sample-every", type=int, default=1,
                     help="Analyze every Nth frame (default 1; fastest sweeps benefit from 1)")
     ap.add_argument("--edge-fraction", type=float, default=.03)
+    ap.add_argument("--selection", choices=("diverse", "near-front"), default="diverse",
+                    help="near-front limits selection to an approximate frontal window")
+    ap.add_argument("--front-progress", type=float, default=.5,
+                    help="Estimated frontal viewpoint in cumulative motion progress (default 0.5)")
+    ap.add_argument("--sweep-half-angle", type=float, default=None,
+                    help="Approximate physical half sweep, degrees; required with near-front")
+    ap.add_argument("--max-angle", type=float, default=15.,
+                    help="Desired angular distance from frontal view (default 15 degrees; estimated only)")
+    ap.add_argument("--output-subdir", type=str, default=None,
+                    help="New subfolder under extracted/.../LR or FB; avoids touching old data")
     ap.add_argument("--replace", action="store_true",
                     help="Replace extracted PNGs for each matching video. WARNING: old labels may no longer match.")
     args = ap.parse_args()
     if args.per_video < 1 or args.sample_every < 1 or not 0 <= args.edge_fraction < .4:
         ap.error("Invalid sampling configuration")
+    if args.selection == "near-front":
+        if args.sweep_half_angle is None or args.sweep_half_angle <= args.max_angle or args.max_angle <= 0:
+            ap.error("--selection near-front requires --sweep-half-angle greater than --max-angle (>0)")
+        if not 0 < args.front_progress < 1:
+            ap.error("--front-progress must be between 0 and 1")
+        if args.output_subdir is None:
+            args.output_subdir = "near_front_15" if args.max_angle == 15 else f"near_front_{args.max_angle:g}"
+    if args.output_subdir is not None and (not re.fullmatch(r"[A-Za-z0-9_-]+", args.output_subdir)
+                                         or args.output_subdir in (".", "..")):
+        ap.error("--output-subdir must contain only letters, numbers, underscores or hyphens")
     if not re.fullmatch(r"s\d+", args.session):
         ap.error("--session must look like s01")
 
     source = ROOT / "data/raw" / args.color / "train/single/oblique/videos" / f"h01_{args.session}" / args.direction
     dest = ROOT / "data/raw" / args.color / "train/single/oblique/extracted" / f"h01_{args.session}" / args.direction
+    if args.output_subdir:
+        dest = dest / args.output_subdir
     if not source.is_dir():
         ap.error(f"No video directory: {source}")
     videos = sorted(p for p in source.iterdir() if PATTERN.fullmatch(p.name))
@@ -213,7 +268,16 @@ def main():
             print(f"SKIP {video.name}: {len(existing)} extracted frames exist (use --replace deliberately)")
             continue
         idx, focus, progress, fps = scan_video(video, args.sample_every)
-        picks = choose(idx, focus, progress, args.per_video, args.edge_fraction)
+        if args.selection == "near-front":
+            try:
+                picks = choose_near_front(idx, focus, progress, args.per_video,
+                                          args.front_progress, args.sweep_half_angle,
+                                          args.max_angle, args.edge_fraction)
+            except ValueError as exc:
+                print(f"WARNING {video.name}: {exc}")
+                continue
+        else:
+            picks = choose(idx, focus, progress, args.per_video, args.edge_fraction)
         if not picks:
             print(f"WARNING {video.name}: no frames")
             continue
@@ -244,9 +308,13 @@ def main():
                 "card_id":card["card_id"],"direction":direction,
                 "frame_index":int(idx[k]),"frame_time_seconds":f"{idx[k]/fps:.3f}",
                 "sharpness":f"{focus[k]:.2f}","motion_progress":f"{progress[k]:.4f}",
-                "selection_method":"visual_change_and_sharpness",
+                "selection_method":("estimated_near_front_and_sharpness" if args.selection == "near-front"
+                                    else "visual_change_and_sharpness"),
                 "selected_position":position,
-                "note":"REVIEW viewpoint, blur, card completeness, and labels",
+                "note":(f"ESTIMATED only: within +/-{args.max_angle:g} degrees "
+                        f"if sweep +/-{args.sweep_half_angle:g} degrees and motion progress "
+                        f"is linear; REVIEW actual viewpoint" if args.selection == "near-front"
+                        else "REVIEW viewpoint, blur, card completeness, and labels"),
             })
         print(f"{video.name}: frames={len(idx)} selected={selected} progress="
               f"{[round(float(progress[i]),2) for i in picks]}")
