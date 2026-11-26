@@ -35,20 +35,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--color", choices=COLORS, required=True)
     ap.add_argument("--session", default="s01")
+    ap.add_argument("--frame-set", choices=("front_45","near_front_15"), default="front_45")
     args = ap.parse_args()
     with (ROOT / "data/metadata" / f"{args.color}_cards.csv").open(
             encoding="utf-8-sig", newline="") as f:
         cards = list(csv.DictReader(f))
     out = ROOT / "data/annotations/video_frames" / args.color
     out.mkdir(parents=True, exist_ok=True)
-    target = out / "review_gallery.html"
+    target = out / ("review_gallery.html" if args.frame_set == "front_45" else f"review_gallery_{args.frame_set}.html")
     entries = []
     for card in cards:
         cid = int(card["card_id"])
         for direction in ("LR", "FB"):
             frames = (ROOT / "data/raw" / args.color / "train/single/oblique/extracted" /
-                      f"h01_{args.session}" / direction)
-            annotations = out / f"h01_{args.session}" / (direction + "_annotated")
+                      f"h01_{args.session}" / direction / args.frame_set)
+            base = out / f"h01_{args.session}"
+            if args.frame_set != "front_45":
+                base = base / args.frame_set
+            annotations = base / (direction + "_annotated")
             preview_dir = annotations / "previews"
             label_dir = annotations / "labels"
             report = annotations / "annotation_report.csv"
