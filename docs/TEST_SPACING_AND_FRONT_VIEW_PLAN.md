@@ -81,3 +81,35 @@ uv run --no-sync python scripts/inference/predict_green20.py --model runs/green2
 ```
 
 `--source` は必須で、ユーザーが指定した画像ファイル・フォルダを使用する。旧 `dev/competition` は使わない。対象ファイルの存在確認・推論実行は研究室PCで行う。
+
+## 7. 2026-11-26 アノテーションの整理と倍率再計算
+
+ユーザー指定：`data/annotations/green20_*` を `data/annotations/green20/` 以下にまとめる。`data/annotations/video_frames/` は**移動しない**。
+
+例：
+```text
+data/annotations/
+├── green20/
+│   ├── green20_h01_s01/
+│   ├── green20_h01_s03/
+│   ├── green20_h02_s01/
+│   ├── green20_h03_s01/
+│   ├── green20_h03_s02/
+│   ├── green20_h03_multi_val/
+│   └── green20_fixed_angle_val/
+└── video_frames/              # 変更なし
+```
+
+`green20_*` に一致する**既存のフォルダだけ**移動する（閾値比較フォルダなども必要性を確認）。移動前に元データをバックアップし、コピー先に同名フォルダがある場合は上書きせず停止する。
+
+GitHubでは`auto_annotate.py`、`generate_rotations.py`、`build_green20_v3.py`、`build_green20_video_augmented.py`、`annotate_green20_val_angles.py`、`annotate_multi_val.py`の参照先を新構成に変更済み。動画のアノテーション参照先は従来の`video_frames`のまま。
+
+倍率だけ計算する場合、研究室PCの最新版で次のコマンドを実行する。
+
+```powershell
+uv run --no-sync python scripts/dataset/calculate_green20_scales.py
+```
+
+新しいh01と既存のh02/h03の`s01`画像20枚、各`green20_h??_s01/report.csv`、各ラベルが必要。各画像のアノテーション四隅から`sqrt(札の四角形面積/画像面積)`を求め、高さごとに20枚の中央値を取る。h01=1としてh02/h03比を計算し、`reports/green20_scales_日時.csv`に書き出す。**元画像・ラベル・データセットを上書きしない**。倍率計算は新動画フレーム抽出やVal画像の完了を待つ必要がない。
+
+この手順のPC上での動作結果は未確認。実行ログを見て倍率が妥当か確認すること。
