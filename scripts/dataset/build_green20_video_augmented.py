@@ -101,7 +101,7 @@ def scale_by_area(top):
 def video_sources(mapping):
     all_items=[]
     for direction in ("LR","FB"):
-        folder=RAW/"train/single/oblique/extracted/h01_s01"/direction
+        folder=RAW/"train/single/oblique/extracted/h01_s01"/direction/"front_45"
         labels=VIDEO/f"{direction}_annotated"/"labels"
         images=image_files(folder)
         if len(images)!=100:
