@@ -198,6 +198,7 @@ def main():
                 for cls,(xx,yy,card,mask) in zip(classes,positions):
                     ch,cw=card.shape[:2]
                     canvas[yy:yy+ch,xx:xx+cw][mask>0]=card[mask>0]
+                    preview[yy:yy+ch,xx:xx+cw][mask>0]=card[mask>0]
                     ys,xs=np.where(mask>0)
                     x0,x1=xx+int(xs.min()),xx+int(xs.max())+1
                     y0,y1=yy+int(ys.min()),yy+int(ys.max())+1
