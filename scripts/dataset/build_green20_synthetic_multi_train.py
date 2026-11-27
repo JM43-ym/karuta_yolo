@@ -86,12 +86,24 @@ def make_background(h, w, rng):
 
 def compose(cutouts, shape, rng):
     h,w=shape[:2]
-    height = rng.randrange(220, 285)  # Approximate h03 card height in 1440x1080
+    # ONE physical card size is chosen for this image, then shared by every
+    # card. A 90-degree rotation swaps width/height but never changes its size.
+    long_side = rng.randrange(220, 285)
+    short_side = round(long_side * 52 / 73)
     cards=[]
     for crop, mask in cutouts:
-        scale = height/crop.shape[0]*rng.uniform(.96,1.04)
-        cw,ch = round(crop.shape[1]*scale),round(crop.shape[0]*scale)
-        cards.append((cv2.resize(crop,(cw,ch)),cv2.resize(mask,(cw,ch),interpolation=cv2.INTER_NEAREST)))
+        # Source crops are near-front, zero-rotation Train examples. Normalize
+        # their canvas orientation before resizing to the same 52:73 geometry.
+        if crop.shape[1] > crop.shape[0]:
+            crop = cv2.rotate(crop, cv2.ROTATE_90_CLOCKWISE)
+            mask = cv2.rotate(mask, cv2.ROTATE_90_CLOCKWISE)
+        card = cv2.resize(crop,(short_side,long_side),interpolation=cv2.INTER_AREA)
+        alpha = cv2.resize(mask,(short_side,long_side),interpolation=cv2.INTER_NEAREST)
+        orientation = rng.choice((0, 1, 2, 3))
+        if orientation:
+            card = np.rot90(card,orientation).copy()
+            alpha = np.rot90(alpha,orientation).copy()
+        cards.append((card,alpha))
     gap = rng.choice((0,0,3,6,12))
     total=sum(card.shape[1] for card,_ in cards)+gap*(len(cards)-1)
     if total>int(w*.8) or max(card.shape[0] for card,_ in cards)>int(h*.65):
@@ -150,16 +162,20 @@ def main():
     for p in val:
         if not (src_val_labels/(p.stem+".txt")).is_file():
             ap.error(f"Missing Val label: {p}")
-    # Select Train h03-like scale only, not any Val or Test image.
+    # Use scale2 and zero-rotation sources ONLY. Rotated input crops have
+    # different axis-aligned widths/heights even though physical cards match.
+    # Rotate AFTER resizing, so every card in a scene has identical dimensions.
+    # All source images are Train; never use Val or Test for composition.
     by_class={i:[] for i in range(20)}
     for p in train:
-        if "_scale2_" in p.stem:
+        if p.stem.endswith(("_scale2_rot000", "_scale2_rotp00")):
             cls,_=read_label(src_labels/(p.stem+".txt"))
             by_class[cls].append(p)
     if any(not files for files in by_class.values()):
         ap.error("Missing Train scale2 variants for some classes")
     print(f"CHECK OK: existing Train={len(train)}, Val={len(val)}, all 20 classes available")
     print(f"Planned new Train={len(train)+args.two+args.three}: 2-card +{args.two}, 3-card +{args.three}")
+    print("Each synthetic image uses one shared physical card size (52:73), including rotated cards.")
     if not args.build:
         print("Dry run only. Use --build to create output.")
         return
