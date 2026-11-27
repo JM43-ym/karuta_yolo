@@ -84,12 +84,50 @@ def make_background(h, w, rng):
     return cv2.cvtColor(gray,cv2.COLOR_GRAY2BGR)
 
 
-def compose(cutouts, shape, rng):
+def measure_h03_card_size():
+    """Median actual short/long card edges in h03_s01 annotations (pixels)."""
+    folder = ROOT / "data/raw/green20/train/single/top/h03_s01"
+    report = ROOT / "data/annotations/green20/green20_h03_s01/report.csv"
+    if not folder.is_dir() or not report.is_file():
+        raise FileNotFoundError(f"Missing h03_s01 measurement sources: {folder} / {report}")
+    with report.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    if len(rows) != 20:
+        raise ValueError(f"Expected 20 h03_s01 annotations, found {len(rows)}")
+    lengths = []
+    sizes = set()
+    for row in rows:
+        p = folder / row["filename"]
+        if not p.is_file():
+            raise FileNotFoundError(p)
+        original = read_image(p)
+        h, w = original.shape[:2]
+        sizes.add((h, w))
+        if row.get("status") != "REVIEW":
+            raise ValueError(f"Unreviewed h03 annotation: {p.name}")
+        corners = np.asarray([
+            [float(v) for v in pair.split(",")]
+            for pair in row["corner_points_px"].split(";")
+        ], dtype=np.float32)
+        if corners.shape != (4, 2) or not np.isfinite(corners).all():
+            raise ValueError(f"Invalid h03 four corners: {p.name}")
+        # minAreaRect is rotation invariant, unlike a YOLO axis-aligned box.
+        (_, _), (a, b), _ = cv2.minAreaRect(corners)
+        shorter, longer = sorted((a, b))
+        if shorter < 10 or longer < shorter or longer > max(w, h):
+            raise ValueError(f"Implausible h03 dimensions: {p.name} ({a}, {b})")
+        lengths.append((shorter, longer))
+    if len(sizes) != 1:
+        raise ValueError(f"h03 camera frame resolutions differ: {sizes}")
+    short = round(float(np.median([v[0] for v in lengths])))
+    long = round(float(np.median([v[1] for v in lengths])))
+    return short, long, next(iter(sizes))
+
+
+def compose(cutouts, shape, rng, short_side, long_side):
     h,w=shape[:2]
     # ONE physical card size is chosen for this image, then shared by every
     # card. A 90-degree rotation swaps width/height but never changes its size.
-    long_side = rng.randrange(220, 285)
-    short_side = round(long_side * 52 / 73)
     cards=[]
     for crop, mask in cutouts:
         # Source crops are near-front, zero-rotation Train examples. Normalize
@@ -173,9 +211,12 @@ def main():
             by_class[cls].append(p)
     if any(not files for files in by_class.values()):
         ap.error("Missing Train scale2 variants for some classes")
+    short_side, long_side, h03_frame_shape = measure_h03_card_size()
+    print(f"h03_s01 measured card size: short={short_side}px, long={long_side}px (median of 20)")
+    print(f"h03_s01 frame: {h03_frame_shape[1]}x{h03_frame_shape[0]}")
     print(f"CHECK OK: existing Train={len(train)}, Val={len(val)}, all 20 classes available")
     print(f"Planned new Train={len(train)+args.two+args.three}: 2-card +{args.two}, 3-card +{args.three}")
-    print("Each synthetic image uses one shared physical card size (52:73), including rotated cards.")
+    print(f"Every synthetic card uses the measured h03_s01 size {short_side}x{long_side}px (rotations swap axes).")
     if not args.build:
         print("Dry run only. Use --build to create output.")
         return
@@ -214,7 +255,9 @@ def main():
                             if attempt==15:
                                 raise
                 canvas=make_background(shape[0],shape[1],rng)
-                positions=compose(chosen,shape,rng)
+                if shape[:2] != h03_frame_shape:
+                    raise ValueError(f"Synthesis canvas {shape[:2]} differs from measured h03 camera {h03_frame_shape}")
+                positions=compose(chosen,shape,rng,short_side,long_side)
                 preview=canvas.copy()
                 lines=[]
                 for cls,(xx,yy,card,mask) in zip(classes,positions):
@@ -243,6 +286,10 @@ def main():
             "names":{i:str(v) for i,v in enumerate(names)}
         }
         (out/"data.yaml").write_text(yaml.safe_dump(cfg_out,sort_keys=False,allow_unicode=True),encoding="utf-8")
+        (out/"h03_target_size.txt").write_text(
+            f"reference=h03_s01\nshort_side_px={short_side}\nlong_side_px={long_side}\n"
+            f"frame_width={h03_frame_shape[1]}\nframe_height={h03_frame_shape[0]}\n",
+            encoding="utf-8")
         with (out/"source_manifest.csv").open("w",encoding="utf-8-sig",newline="") as f:
             writer=csv.writer(f)
             writer.writerow(["synthetic_stem","card_count","source_train_images","class_ids"])
