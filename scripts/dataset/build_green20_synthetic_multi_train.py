@@ -96,7 +96,13 @@ def compose(cutouts, shape, rng):
     total=sum(card.shape[1] for card,_ in cards)+gap*(len(cards)-1)
     if total>int(w*.8) or max(card.shape[0] for card,_ in cards)>int(h*.65):
         raise ValueError("Group too large for frame")
-    x=rng.randint(max(8,round(w*.1)),max(9,round(w*.85-total)))
+    # The total group width is at most 80% of the canvas. Reserve symmetric
+    # 7.5% margins so randint always receives a valid, nonempty interval.
+    margin=max(8,round(w*.075))
+    left_max=w-total-margin
+    if left_max<margin:
+        raise ValueError(f"Group width {total} exceeds usable canvas width {w-2*margin}")
+    x=rng.randint(margin,left_max)
     y=rng.randint(max(8,round(h*.1)),max(9,round(h*.6)))
     positions=[]
     for card,mask in cards:
